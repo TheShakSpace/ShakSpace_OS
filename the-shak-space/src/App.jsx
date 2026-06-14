@@ -1,8 +1,10 @@
 function App() {
   return (
-    <h1 className="text-3xl font-bold text-blue-500 underline">
-      Hello Tailwind!
-    </h1>
+    <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <h1 className="text-5xl font-bold">
+        Hello Shak Space
+      </h1>
+    </div>
   )
 }
 
