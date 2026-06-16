@@ -1,9 +1,14 @@
 import React from "react";
 import { Cpu, Workflow } from "lucide-react";
-import { useApp } from "../context/AppContext";
 
 export default function AutomationPage() {
-  const { automations, setAutomations, addNewLog } = useApp();
+  const [automations, setAutomations] = React.useState([
+    { id: 1, name: "Auto-sort Incoming Slack Files", trigger: "Slack File Uploaded", action: "Move to Knowledge Hub", active: true },
+    { id: 2, name: "Weekly Workspace Summary PDF", trigger: "Every Friday at 5 PM", action: "Generate Document & Email", active: true },
+    { id: 3, name: "Sync Notes to GitHub Gist", trigger: "On Note Created", action: "Trigger REST Endpoint", active: false },
+  ]);
+
+  const addNewLog = () => {};
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -45,8 +50,8 @@ export default function AutomationPage() {
 
             <button 
               onClick={() => {
-                setAutomations(prev => prev.map(a => a.id === rule.id ? { ...a, active: !a.active } : a));
-                addNewLog("System Trigger", rule.active ? "paused pipeline" : "re-activated pipeline", rule.name, "Cpu");
+                setAutomations((prev) => prev.map((a) => (a.id === rule.id ? { ...a, active: !a.active } : a)));
+                addNewLog();
               }}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
                 rule.active 

@@ -1,6 +1,5 @@
 import React from "react";
 import { Bot, Send } from "lucide-react";
-import { useApp } from "../context/AppContext";
 
 export default function AIAssistantPage() {
   const {
@@ -8,7 +7,7 @@ export default function AIAssistantPage() {
     setAiInput,
     aiMessages,
     isAiTyping,
-    askAiSimulation
+    askAiSimulation,
   } = useApp();
 
   return (

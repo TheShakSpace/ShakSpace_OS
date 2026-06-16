@@ -1,9 +1,24 @@
 import React from "react";
 import { Plus, FileText } from "lucide-react";
-import { useApp } from "../context/AppContext";
 
 export default function KnowledgeHubPage() {
-  const { notes, handleAddNewNote } = useApp();
+  const [notes, setNotes] = React.useState([
+    { id: 1, title: "Product Requirements Doc (PRD)", date: "Jun 14, 2026", duration: "5 min read" },
+    { id: 2, title: "Vibe and Aesthetic Guidelines", date: "Jun 12, 2026", duration: "12 min read" },
+    { id: 3, title: "Next.js 16 Server Components Plan", date: "Jun 10, 2026", duration: "3 min read" },
+  ]);
+
+  const handleAddNewNote = () => {
+    const defaultTitles = ["Weekly Standup Minutes", "Brainstorming Session Notes", "System Design Architecture", "Marketing Outlines"];
+    const title = defaultTitles[Math.floor(Math.random() * defaultTitles.length)];
+    const newNote = {
+      id: Date.now(),
+      title,
+      date: "Jun 14, 2026",
+      duration: `${Math.floor(Math.random() * 8) + 2} min read`,
+    };
+    setNotes([newNote, ...notes]);
+  };
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">

@@ -1,10 +1,35 @@
 import React from "react";
 import { motion } from "motion/react";
 import { Plus, ArrowUpRight } from "lucide-react";
-import { useApp } from "../context/AppContext";
 
 export default function WorkspacesPage() {
-  const { workspaces, handleAddNewWorkspace } = useApp();
+  const [workspaces, setWorkspaces] = React.useState([
+    { id: "1", name: "Acme Client space", items: 12, category: "Design", updated: "2m ago", color: "from-blue-500/20 to-indigo-500/10" },
+    { id: "2", name: "Product Design Hub", items: 8, category: "Product", updated: "45m ago", color: "from-purple-500/20 to-pink-500/10" },
+    { id: "3", name: "Marketing Collateral", items: 15, category: "Marketing", updated: "1d ago", color: "from-amber-500/20 to-orange-500/10" },
+    { id: "4", name: "Engineering Monorepo", items: 34, category: "Development", updated: "3d ago", color: "from-emerald-500/20 to-teal-500/10" },
+  ]);
+
+  const handleAddNewWorkspace = () => {
+    const names = ["Aperture Science Hub", "Vector Sync Platform", "Black Mesa Portal", "Oasis Sandbox"];
+    const cats = ["Research", "Platform", "Engineering", "Design"];
+    const colors = [
+      "from-rose-500/20 to-red-500/10",
+      "from-cyan-500/20 to-blue-500/10",
+      "from-indigo-500/20 to-purple-500/10",
+      "from-violet-500/20 to-fuchsia-500/10",
+    ];
+    const index = Math.floor(Math.random() * names.length);
+    const newWs = {
+      id: String(Date.now()),
+      name: names[index],
+      items: Math.floor(Math.random() * 20) + 1,
+      category: cats[index],
+      updated: "Just now",
+      color: colors[index],
+    };
+    setWorkspaces([newWs, ...workspaces]);
+  };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
