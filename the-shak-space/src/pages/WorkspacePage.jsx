@@ -18,7 +18,20 @@ export default function WorkspacesPage() {
     category: "",
   });
 
+  const [search, setSearch] = React.useState("");
+  const [activeCategory, setActiveCategory] = React.useState("All");
+
+  const categories = [
+    "All",
+    "Development",
+    "Research",
+    "Client",
+    "Personal",
+    "Learning",
+  ];
+
   const openModal = () => setIsModalOpen(true);
+
   const closeModal = () => {
     setIsModalOpen(false);
     setForm({ name: "", description: "", category: "" });
@@ -52,6 +65,34 @@ export default function WorkspacesPage() {
       <div className="border-b border-white/[0.08] pb-5">
         <p className="text-xs text-[#A0A6B1] mb-2">Workspace Count: {workspaces.length}</p>
         <h1 className="text-2xl font-black text-white">Workspaces</h1>
+
+        <div className="mt-4">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {categories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setActiveCategory(c)}
+                className={`px-3 py-1 rounded-full text-xs border transition-all cursor-pointer ${
+                  activeCategory === c
+                    ? "bg-[#4F8CFF]/20 border-[#4F8CFF]/60 text-white"
+                    : "bg-white/[0.03] border-white/[0.10] text-[#A0A6B1] hover:text-white hover:border-[#4F8CFF]/40"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-[#4F8CFF]/60"
+            placeholder="Search workspaces..."
+          />
+        </div>
+
+
 
 
         <p className="text-xs text-[#A0A6B1] mt-1">
@@ -134,13 +175,28 @@ export default function WorkspacesPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {workspaces.map((workspace) => (
+        {workspaces
+          .filter((workspace) => {
+            const q = search.trim().toLowerCase();
+            if (!q) return true;
 
-          <motion.div 
-            whileHover={{ y: -4 }}
-            key={workspace.id} 
-            className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex flex-col justify-between h-44 relative group overflow-hidden"
-          >
+            const name = (workspace.name ?? "").toString().toLowerCase();
+            const description = (workspace.description ?? "").toString().toLowerCase();
+            const category = (workspace.category ?? "").toString().toLowerCase();
+
+            return (
+              name.includes(q) ||
+              description.includes(q) ||
+              category.includes(q)
+            );
+          })
+          .map((workspace) => (
+            <motion.div
+              whileHover={{ y: -4 }}
+              key={workspace.id}
+              className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex flex-col justify-between h-44 relative group overflow-hidden"
+            >
+
             <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-tr ${workspace.color ?? "from-blue-500/20 to-indigo-500/10"} blur-2xl opacity-30`} />
             <div className="z-10">
               <div className="flex items-center justify-between mb-3">
