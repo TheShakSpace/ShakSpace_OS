@@ -1,72 +1,187 @@
 import React from "react";
 import { motion } from "motion/react";
-import { Plus, ArrowUpRight } from "lucide-react";
+
+import { Plus, ArrowUpRight, Trash2 } from "lucide-react";
+import { useWorkspaceStore } from "../stores/useWorkspaceStore";
+
 
 export default function WorkspacesPage() {
-  const [workspaces, setWorkspaces] = React.useState([
-    { id: "1", name: "Acme Client space", items: 12, category: "Design", updated: "2m ago", color: "from-blue-500/20 to-indigo-500/10" },
-    { id: "2", name: "Product Design Hub", items: 8, category: "Product", updated: "45m ago", color: "from-purple-500/20 to-pink-500/10" },
-    { id: "3", name: "Marketing Collateral", items: 15, category: "Marketing", updated: "1d ago", color: "from-amber-500/20 to-orange-500/10" },
-    { id: "4", name: "Engineering Monorepo", items: 34, category: "Development", updated: "3d ago", color: "from-emerald-500/20 to-teal-500/10" },
-  ]);
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+
+  const { addWorkspace, deleteWorkspace } = useWorkspaceStore();
+
+
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [form, setForm] = React.useState({
+    name: "",
+    description: "",
+    category: "",
+  });
+
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setForm({ name: "", description: "", category: "" });
+  };
 
   const handleAddNewWorkspace = () => {
-    const names = ["Aperture Science Hub", "Vector Sync Platform", "Black Mesa Portal", "Oasis Sandbox"];
-    const cats = ["Research", "Platform", "Engineering", "Design"];
-    const colors = [
-      "from-rose-500/20 to-red-500/10",
-      "from-cyan-500/20 to-blue-500/10",
-      "from-indigo-500/20 to-purple-500/10",
-      "from-violet-500/20 to-fuchsia-500/10",
-    ];
-    const index = Math.floor(Math.random() * names.length);
-    const newWs = {
+    openModal();
+  };
+
+  const handleCreateWorkspace = () => {
+    const name = form.name.trim();
+    const description = form.description.trim();
+    const category = form.category.trim();
+
+    if (!name) return;
+
+    addWorkspace({
       id: String(Date.now()),
-      name: names[index],
-      items: Math.floor(Math.random() * 20) + 1,
-      category: cats[index],
-      updated: "Just now",
-      color: colors[index],
-    };
-    setWorkspaces([newWs, ...workspaces]);
+      name,
+      description: description || `${name} workspace`,
+      category: category || "Development",
+      createdAt: new Date().toISOString(),
+    });
+
+    closeModal();
   };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
+
       <div className="border-b border-white/[0.08] pb-5">
+        <p className="text-xs text-[#A0A6B1] mb-2">Workspace Count: {workspaces.length}</p>
         <h1 className="text-2xl font-black text-white">Workspaces</h1>
+
+
         <p className="text-xs text-[#A0A6B1] mt-1">
           Manage your isolated directories, project contexts, and external assets pipelines under sandboxed boundaries.
         </p>
       </div>
 
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={closeModal}
+          />
+
+          <div className="relative w-full max-w-lg rounded-2xl border border-white/[0.10] bg-white/[0.03] p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-lg font-black text-white">Create Workspace</h2>
+                <p className="text-xs text-[#A0A6B1] mt-1">Set up a sandboxed space with its metadata.</p>
+              </div>
+              <button
+                onClick={closeModal}
+                className="text-[#A0A6B1] hover:text-white transition-colors cursor-pointer rounded-lg px-2 py-1"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-white mb-1">Workspace Name</label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                  className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-[#4F8CFF]/60"
+                  placeholder="e.g. Research Hub"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-white mb-1">Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                  rows={3}
+                  className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-[#4F8CFF]/60 resize-none"
+                  placeholder="What will this workspace contain?"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-white mb-1">Category</label>
+                <input
+                  value={form.category}
+                  onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))}
+                  className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-[#4F8CFF]/60"
+                  placeholder="e.g. Development"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center gap-3 justify-end">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 rounded-xl text-sm border border-white/[0.10] text-[#A0A6B1] hover:text-white hover:border-white/[0.20] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateWorkspace}
+                className="px-4 py-2 rounded-xl text-sm bg-[#4F8CFF] text-white hover:brightness-110 transition-all cursor-pointer disabled:opacity-60"
+                disabled={!form.name.trim()}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {workspaces.map((ws) => (
+        {workspaces.map((workspace) => (
+
           <motion.div 
             whileHover={{ y: -4 }}
-            key={ws.id} 
+            key={workspace.id} 
             className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex flex-col justify-between h-44 relative group overflow-hidden"
           >
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-tr ${ws.color} blur-2xl opacity-30`} />
+            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-tr ${workspace.color ?? "from-blue-500/20 to-indigo-500/10"} blur-2xl opacity-30`} />
             <div className="z-10">
               <div className="flex items-center justify-between mb-3">
                 <span className="px-2 py-0.5 bg-white/[0.05] border border-white/[0.08] text-[9px] font-bold uppercase text-[#4F8CFF] rounded-full">
-                  {ws.category}
+                  {workspace.category ?? "Development"}
                 </span>
-                <span className="text-[10px] text-[#A0A6B1]">{ws.updated}</span>
+                <span className="text-[10px] text-[#A0A6B1]">{workspace.updated ?? "Just now"}</span>
               </div>
-              <h3 className="text-sm font-bold text-white block truncate">{ws.name}</h3>
-              <p className="text-xs text-[#A0A6B1] mt-1 line-clamp-2">Contains dynamic code representations, metadata guidelines, and live assets sync.</p>
+              <h3 className="text-sm font-bold text-white block truncate">{workspace.name}</h3>
+              <p className="text-xs text-[#A0A6B1] mt-1 line-clamp-2">{workspace.description ?? "Contains dynamic code representations, metadata guidelines, and live assets sync."}</p>
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-white/[0.04] mt-4 z-10">
-              <span className="text-[11px] text-[#A0A6B1]">{ws.items} items indexed</span>
+              <span className="text-[11px] text-[#A0A6B1]">{workspace.items ?? 0} items indexed</span>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  const ok = window.confirm("Delete this workspace?");
+                  if (!ok) return;
+
+                  // workspace.id is the key in the store
+                  deleteWorkspace(workspace.id);
+                }}
+                className="text-[11px] text-[#A0A6B1] hover:text-white flex items-center gap-1 cursor-pointer"
+                aria-label="Delete workspace"
+              >
+                <Trash2 size={14} />
+              </button>
+
               <button className="text-[11px] text-[#4F8CFF] hover:underline flex items-center gap-1 cursor-pointer">
                 Enter Space <ArrowUpRight size={12} />
               </button>
             </div>
+
           </motion.div>
         ))}
+
 
         {/* New workspace trigger card */}
         <button 
