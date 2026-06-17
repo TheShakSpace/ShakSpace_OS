@@ -37,8 +37,9 @@ export default function SplashScreen({ onComplete }) {
       setPhase(4);
 
       const exitTimer = setTimeout(() => {
-        onComplete();
+        onComplete?.();
       }, 900);
+
 
       return () => clearTimeout(exitTimer);
     }

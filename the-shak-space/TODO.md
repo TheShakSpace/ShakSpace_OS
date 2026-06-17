@@ -1,5 +1,10 @@
-- [ ] Replace sidebar navigation buttons in AppLayout.jsx with React Router NavLink (route-based active highlighting).
-- [ ] Ensure imports include NavLink (and remove/ignore activeTab usage for sidebar).
-- [ ] Keep UI/styling/animations unchanged.
-- [ ] Verify sidebar routes match: /, /workspaces, /knowledge, /ai, /automation, /settings.
+# Shakspace_OS TODO
+
+- [ ] Add Edit Workspace functionality to `src/pages/WorkspacePage.jsx`
+  - [ ] Add edit button on each workspace card
+  - [ ] Add glassmorphism edit modal (name/description/category)
+  - [ ] Pre-fill modal with workspace values
+  - [ ] On Save call `updateWorkspace(id, { name, description, category, updated: new Date().toISOString() })`
+  - [ ] Ensure create + delete flows remain unchanged
+  - [ ] Preserve existing styling and animations
 
