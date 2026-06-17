@@ -19,11 +19,7 @@ export const useAuthStore = create(
           isAuthenticated: false,
         }),
 
-      register: (userData) =>
-        set({
-          user: userData,
-          isAuthenticated: true,
-        }),
+
     }),
     {
       name: "shak-space-auth",

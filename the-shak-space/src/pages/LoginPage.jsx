@@ -59,7 +59,6 @@ export default function LoginPage() {
     return () => window.clearTimeout(t1);
   }, [lineIndex, lines.length]);
 
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
@@ -111,24 +110,37 @@ export default function LoginPage() {
                     <Layers size={18} />
                   </div>
                   <div>
-                    <div className="text-sm font-mono text-[#A0A6B1] tracking-widest uppercase">THE SHAK SPACE</div>
-                    <div className="text-[13px] font-black text-white">Internet Operating System</div>
+                    <div className="text-sm font-mono text-[#A0A6B1] tracking-widest uppercase">
+                      THE SHAK SPACE
+                    </div>
+                    <div className="text-[13px] font-black text-white">
+                      Internet Operating System
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Cpu size={16} className="text-[#4F8CFF]" />
-                    <div className="text-xs text-[#A0A6B1]">Index + Execute Workflows</div>
+                    <div className="text-xs text-[#A0A6B1]">
+                      Index + Execute Workflows
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    {["Workspace Management", "Knowledge Hub", "AI Assistant", "Automation Engine"].map((t) => (
+                    {[
+                      "Workspace Management",
+                      "Knowledge Hub",
+                      "AI Assistant",
+                      "Automation Engine",
+                    ].map((t) => (
                       <div key={t} className="flex items-center gap-2">
                         <span className="w-5 h-5 rounded-lg bg-[#4F8CFF]/15 border border-[#4F8CFF]/30 flex items-center justify-center">
                           <Sparkles size={14} className="text-[#4F8CFF]" />
                         </span>
-                        <span className="text-xs font-semibold text-white/90">✓ {t}</span>
+                        <span className="text-xs font-semibold text-white/90">
+                          ✓ {t}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -162,11 +174,15 @@ export default function LoginPage() {
                       transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut" }}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#4F8CFF]/30 bg-[#4F8CFF]/10"
                     >
-                      <span className="text-xs font-mono tracking-widest uppercase text-[#A0A6B1]">THE SHAK SPACE OS</span>
+                      <span className="text-xs font-mono tracking-widest uppercase text-[#A0A6B1]">
+                        THE SHAK SPACE OS
+                      </span>
                     </motion.div>
 
                     <div className="mt-5">
-                      <div className="text-[11px] font-mono text-white/60">{typedLine || " "}</div>
+                      <div className="text-[11px] font-mono text-white/60">
+                        {typedLine || " "}
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -178,13 +194,17 @@ export default function LoginPage() {
                       <span className="text-xl font-black tracking-widest">S</span>
                     </div>
                     <h1 className="mt-4 text-2xl font-black text-white">Welcome back</h1>
-                    <p className="mt-1 text-[11px] text-[#A0A6B1]">Sign in to The Shak Space</p>
+                    <p className="mt-1 text-[11px] text-[#A0A6B1]">
+                      Sign in to The Shak Space
+                    </p>
                   </div>
 
                   <form
                     className="space-y-4"
                     onSubmit={(e) => {
                       e.preventDefault();
+                      console.log("[LoginPage] form submit");
+                      handleLogin();
                     }}
                   >
                     <div>
@@ -255,16 +275,6 @@ export default function LoginPage() {
                       </span>
                       Continue with Google
                     </button>
-
-                    <div className="mt-2 text-center">
-                      <span className="text-[12px] text-[#A0A6B1]">Don&apos;t have an account? </span>
-                      <button
-                        type="button"
-                        className="text-[12px] text-[#4F8CFF] hover:underline cursor-pointer font-bold"
-                      >
-                        Register
-                      </button>
-                    </div>
                   </form>
                 </div>
               </div>
@@ -289,10 +299,14 @@ export default function LoginPage() {
                   transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut" }}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#4F8CFF]/30 bg-[#4F8CFF]/10"
                 >
-                  <span className="text-xs font-mono tracking-widest uppercase text-[#A0A6B1]">THE SHAK SPACE OS</span>
+                  <span className="text-xs font-mono tracking-widest uppercase text-[#A0A6B1]">
+                    THE SHAK SPACE OS
+                  </span>
                 </motion.div>
 
-                <div className="mt-4 text-[11px] font-mono text-white/60">{typedLine || " "}</div>
+                <div className="mt-4 text-[11px] font-mono text-white/60">
+                  {typedLine || " "}
+                </div>
 
                 <div className="mt-6 rounded-2xl border border-[#4F8CFF]/25 bg-white/[0.02] p-5">
                   <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#4F8CFF] via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/10 ring-1 ring-white/10">
@@ -374,16 +388,6 @@ export default function LoginPage() {
                       </span>
                       Continue with Google
                     </button>
-
-                    <div className="mt-2 text-center">
-                      <span className="text-[12px] text-[#A0A6B1]">Don&apos;t have an account? </span>
-                      <button
-                        type="button"
-                        className="text-[12px] text-[#4F8CFF] hover:underline cursor-pointer font-bold"
-                      >
-                        Register
-                      </button>
-                    </div>
                   </form>
                 </div>
               </div>

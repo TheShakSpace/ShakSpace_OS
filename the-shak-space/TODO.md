@@ -1,10 +1,12 @@
-# Shakspace_OS TODO
+# TODO - Remove Register feature
 
-- [ ] Add Edit Workspace functionality to `src/pages/WorkspacePage.jsx`
-  - [ ] Add edit button on each workspace card
-  - [ ] Add glassmorphism edit modal (name/description/category)
-  - [ ] Pre-fill modal with workspace values
-  - [ ] On Save call `updateWorkspace(id, { name, description, category, updated: new Date().toISOString() })`
-  - [ ] Ensure create + delete flows remain unchanged
-  - [ ] Preserve existing styling and animations
+- [ ] Update `src/App.jsx` to remove `/register` route and any RegisterPage imports/usages.
+- [ ] Update `src/pages/LoginPage.jsx` to remove Register button/link and any navigation to `/register`.
+- [x] Update `src/App.jsx` to remove `/register` route and any RegisterPage imports/usages.
+- [x] Update `src/pages/LoginPage.jsx` to remove Register button/link and any navigation to `/register`.
+- [x] Update `src/stores/useAuthStore.js` to remove `register()` if unused after cleanup.
+- [x] Delete `src/pages/RegisterPage.jsx`.
+- [ ] Search codebase for remaining references: `RegisterPage`, `/register`, `register(`, `navigate("/register")`, `Link to="/register"`.
+- [ ] Run dev server / build checks to ensure no blank screens, route errors, or console errors.
+
 
