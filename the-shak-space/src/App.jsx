@@ -10,6 +10,7 @@ import KnowledgeHubPage from "./pages/KnowledgeHubPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import AutomationPage from "./pages/AutomationPage";
 import SettingsPage from "./pages/SettingsPage";
+import LoginPage from "./pages/LoginPage";
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -29,7 +30,9 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<AppLayout><DashboardPage /></AppLayout>} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/workspaces" element={<AppLayout><WorkspacesPage /></AppLayout>} />
+
       <Route path="/knowledge" element={<AppLayout><KnowledgeHubPage /></AppLayout>} />
       <Route path="/ai" element={<AppLayout><AIAssistantPage /></AppLayout>} />
       <Route path="/automation" element={<AppLayout><AutomationPage /></AppLayout>} />
