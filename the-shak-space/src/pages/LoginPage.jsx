@@ -1,5 +1,6 @@
 import React from "react";
 import { motion } from "motion/react";
+import { useNavigate } from "react-router-dom";
 
 import ParticleField from "../components/splash/ParticleField";
 
@@ -15,13 +16,29 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { useAuthStore } from "../stores/useAuthStore";
+
 export default function LoginPage() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [rememberMe, setRememberMe] = React.useState(true);
 
+  const login = useAuthStore((state) => state.login);
+
   const [typedLine, setTypedLine] = React.useState("");
   const [lineIndex, setLineIndex] = React.useState(0);
+
+  const handleLogin = () => {
+    login({
+      email,
+      name: "Shakshi",
+    });
+
+    navigate("/");
+  };
+
 
   const lines = [
     "SYSTEM STATUS: ONLINE",
@@ -201,7 +218,7 @@ export default function LoginPage() {
 
                   <form
                     className="space-y-4"
-                    onSubmit={(e) => {
+                  onSubmit={(e) => {
                       e.preventDefault();
                       console.log("[LoginPage] form submit");
                       handleLogin();
