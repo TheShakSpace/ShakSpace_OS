@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "motion/react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 
 import ParticleField from "../components/splash/ParticleField";
 
@@ -25,7 +25,12 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState("");
   const [rememberMe, setRememberMe] = React.useState(true);
 
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const login = useAuthStore((state) => state.login);
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const [typedLine, setTypedLine] = React.useState("");
   const [lineIndex, setLineIndex] = React.useState(0);

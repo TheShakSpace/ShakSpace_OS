@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 
 import SplashScreen from "./components/splash/SplashScreen";
 import AppLayout from "./components/layout/AppLayout";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 import DashboardPage from "./pages/DashboardPage";
 import WorkspacesPage from "./pages/WorkspacePage";
@@ -11,6 +12,7 @@ import AIAssistantPage from "./pages/AIAssistantPage";
 import AutomationPage from "./pages/AutomationPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
+
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -29,14 +31,73 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<AppLayout><DashboardPage /></AppLayout>} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/workspaces" element={<AppLayout><WorkspacesPage /></AppLayout>} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <DashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/knowledge" element={<AppLayout><KnowledgeHubPage /></AppLayout>} />
-      <Route path="/ai" element={<AppLayout><AIAssistantPage /></AppLayout>} />
-      <Route path="/automation" element={<AppLayout><AutomationPage /></AppLayout>} />
-      <Route path="/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route
+        path="/workspaces"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <WorkspacesPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/knowledge"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <KnowledgeHubPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/ai"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AIAssistantPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/automation"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AutomationPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SettingsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
