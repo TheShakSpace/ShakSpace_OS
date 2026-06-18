@@ -1,12 +1,15 @@
 import React from "react";
 import { motion } from "motion/react";
 
-import { Plus, ArrowUpRight, Trash2, Pencil } from "lucide-react";
+import { Plus, ArrowUpRight, Trash2, Pencil, Pin } from "lucide-react";
+
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 
 export default function WorkspacesPage() {
-  const { addWorkspace, deleteWorkspace, updateWorkspace } = useWorkspaceStore();
+  const { addWorkspace, deleteWorkspace, updateWorkspace, togglePinWorkspace } = useWorkspaceStore();
+
   const workspaces = useWorkspaceStore((state) => state.workspaces);
+
 
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [modalMode, setModalMode] = React.useState("create"); // create | edit
@@ -32,7 +35,31 @@ export default function WorkspacesPage() {
     "Learning",
   ];
 
+  const q = search.trim().toLowerCase();
+  const selectedCategoryNormalized = (selectedCategory ?? "All").toString().toLowerCase();
+
+  const filteredWorkspaces = workspaces.filter((workspace) => {
+    const workspaceCategory = (workspace.category ?? "").toString().toLowerCase();
+
+    const categoryMatches =
+      selectedCategoryNormalized === "all" || workspaceCategory === selectedCategoryNormalized;
+
+    if (!categoryMatches) return false;
+    if (!q) return true;
+
+    const name = (workspace.name ?? "").toString().toLowerCase();
+    const description = (workspace.description ?? "").toString().toLowerCase();
+    const category = workspaceCategory;
+
+    return name.includes(q) || description.includes(q) || category.includes(q);
+  });
+
+  const pinnedWorkspaces = filteredWorkspaces.filter((w) => Boolean(w.pinned));
+  const nonPinnedWorkspaces = filteredWorkspaces.filter((w) => !Boolean(w.pinned));
+
+
   const closeModal = () => {
+
     setIsModalOpen(false);
     setModalMode("create");
     setEditingWorkspaceId(null);
@@ -82,10 +109,9 @@ export default function WorkspacesPage() {
 
   const handleSaveEdit = () => {
     if (!editingWorkspaceId) return;
-    const prevCategory = (workspaces.find((w) => w.id === editingWorkspaceId) ?? {}).category;
-
 
     const name = form.name.trim();
+
     const description = form.description.trim();
     const category = form.category.trim();
 
@@ -237,30 +263,115 @@ export default function WorkspacesPage() {
         </div>
       )}
 
+      {pinnedWorkspaces.length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22 }}
+          className="border-b border-white/[0.08] pb-5"
+        >
+
+          <div className="flex items-center gap-2 mb-4">
+            <Pin size={18} className="text-[#4F8CFF]" />
+            <div>
+              <h2 className="text-lg font-black text-white inline-flex items-center gap-2">
+                Pinned Workspaces
+              </h2>
+              <p className="text-xs text-[#A0A6B1] mt-1">Your most important spaces stay on top.</p>
+            </div>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0.7 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.18 }}
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"
+          >
+            {pinnedWorkspaces.map((workspace) => (
+              <motion.div
+                whileHover={{ y: -4 }}
+                key={workspace.id}
+                className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex flex-col justify-between h-44 relative group overflow-hidden"
+              >
+                <div
+                  className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-tr ${
+                    workspace.color ?? "from-blue-500/20 to-indigo-500/10"
+                  } blur-2xl opacity-30`}
+                />
+
+                <div className="z-10">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="px-2 py-0.5 bg-white/[0.05] border border-white/[0.08] text-[9px] font-bold uppercase text-[#4F8CFF] rounded-full">
+                      {workspace.category ?? "Development"}
+                    </span>
+                    <span className="text-[10px] text-[#A0A6B1]">{workspace.updated ?? "Just now"}</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-white block truncate">{workspace.name}</h3>
+                  <p className="text-xs text-[#A0A6B1] mt-1 line-clamp-2">
+                    {workspace.description ?? "Contains dynamic code representations, metadata guidelines, and live assets sync."}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-white/[0.04] mt-4 z-10">
+                  <span className="text-[11px] text-[#A0A6B1]">{workspace.items ?? 0} items indexed</span>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        togglePinWorkspace(workspace.id);
+                      }}
+                      className="text-[11px] text-[#4F8CFF] hover:underline flex items-center gap-1 cursor-pointer"
+                      aria-label="Unpin workspace"
+                    >
+                      <Pin size={14} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openEditModal(workspace);
+                      }}
+                      className="text-[11px] text-[#4F8CFF] hover:underline flex items-center gap-1 cursor-pointer"
+                      aria-label="Edit workspace"
+                    >
+                      <Pencil size={14} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const ok = window.confirm("Delete this workspace?");
+                        if (!ok) return;
+
+                        deleteWorkspace(workspace.id);
+                      }}
+                      className="text-[11px] text-[#A0A6B1] hover:text-white flex items-center gap-1 cursor-pointer"
+                      aria-label="Delete workspace"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <button className="text-[11px] text-[#4F8CFF] hover:underline flex items-center gap-1 cursor-pointer">
+                  Enter Space <ArrowUpRight size={12} />
+                </button>
+              </motion.div>
+            ))}
+          </motion.div>
+        </motion.section>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {workspaces
-          .filter((workspace) => {
-            const q = search.trim().toLowerCase();
-
-            const workspaceCategory = (workspace.category ?? "").toString().toLowerCase();
-            const selectedCategoryNormalized = (selectedCategory ?? "All").toString().toLowerCase();
-
-            const categoryMatches =
-              selectedCategoryNormalized === "all" ||
-              workspaceCategory === selectedCategoryNormalized;
-
-            if (!categoryMatches) return false;
-
-            if (!q) return true;
-
-            const name = (workspace.name ?? "").toString().toLowerCase();
-            const description = (workspace.description ?? "").toString().toLowerCase();
-            const category = workspaceCategory;
-
-            return name.includes(q) || description.includes(q) || category.includes(q);
-          })
-
-          .map((workspace) => (
+        {nonPinnedWorkspaces.map((workspace) => (
             <motion.div
               whileHover={{ y: -4 }}
               key={workspace.id}

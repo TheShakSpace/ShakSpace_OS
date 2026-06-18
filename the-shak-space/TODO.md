@@ -1,12 +1,9 @@
-# TODO - Remove Register feature
+# TODO - WorkspacePage.jsx pinned section
 
-- [ ] Update `src/App.jsx` to remove `/register` route and any RegisterPage imports/usages.
-- [ ] Update `src/pages/LoginPage.jsx` to remove Register button/link and any navigation to `/register`.
-- [x] Update `src/App.jsx` to remove `/register` route and any RegisterPage imports/usages.
-- [x] Update `src/pages/LoginPage.jsx` to remove Register button/link and any navigation to `/register`.
-- [x] Update `src/stores/useAuthStore.js` to remove `register()` if unused after cleanup.
-- [x] Delete `src/pages/RegisterPage.jsx`.
-- [ ] Search codebase for remaining references: `RegisterPage`, `/register`, `register(`, `navigate("/register")`, `Link to="/register"`.
-- [ ] Run dev server / build checks to ensure no blank screens, route errors, or console errors.
-
+- [ ] Review WorkspacePage.jsx current pinned/non-pinned rendering logic.
+- [ ] Ensure pinned workspaces appear in a dedicated “Pinned Workspaces” section above the main grid.
+- [ ] Ensure pinned workspaces are excluded from the normal grid.
+- [ ] Add a pin icon in the section title (and keep existing UI theme).
+- [ ] Add smooth Framer Motion animations for section + cards + list transitions.
+- [ ] Do not modify the store.
 

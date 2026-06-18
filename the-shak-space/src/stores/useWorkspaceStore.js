@@ -7,9 +7,11 @@ const initialWorkspaces = [
     name: "The Shak Space",
     description: "Main operating workspace",
     category: "Development",
+    pinned: false,
     createdAt: new Date().toISOString(),
   },
 ];
+
 
 export const useWorkspaceStore = create(
   persist(
@@ -36,6 +38,16 @@ export const useWorkspaceStore = create(
               : workspace
           ),
         })),
+
+      togglePinWorkspace: (id) =>
+        set((state) => ({
+          workspaces: state.workspaces.map((workspace) =>
+            workspace.id === id
+              ? { ...workspace, pinned: !Boolean(workspace.pinned) }
+              : workspace
+          ),
+        })),
+
     }),
     {
       name: "shak-space-workspaces",
