@@ -7,15 +7,15 @@ export default function KnowledgeRecent({ notes, makeHandlers }) {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4"
+      className="space-y-2.5"
     >
       <div className="flex items-center gap-2">
-        <Clock size={16} className="text-orange-400" />
-        <h2 className="text-sm font-black text-white">Recent Notes</h2>
+        <Clock size={15} className="text-orange-400 shrink-0" />
+        <h2 className="text-sm font-black text-white tracking-tight">Recent Notes</h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr">
         {notes.map((note, i) => (
           <KnowledgeCard key={note.id} note={note} index={i} handlers={makeHandlers(note)} />
         ))}

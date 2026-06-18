@@ -7,15 +7,15 @@ export default function KnowledgePinned({ notes, makeHandlers }) {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4"
+      className="space-y-2.5"
     >
       <div className="flex items-center gap-2">
-        <Pin size={16} className="text-[#4F8CFF]" />
-        <h2 className="text-sm font-black text-white">Pinned Notes</h2>
+        <Pin size={15} className="text-[#4F8CFF] shrink-0" />
+        <h2 className="text-sm font-black text-white tracking-tight">Pinned Notes</h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr">
         {notes.map((note, i) => (
           <KnowledgeCard key={note.id} note={note} index={i} handlers={makeHandlers(note)} />
         ))}

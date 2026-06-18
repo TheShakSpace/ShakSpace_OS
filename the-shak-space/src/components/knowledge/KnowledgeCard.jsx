@@ -94,81 +94,94 @@ export default function KnowledgeCard({ note, handlers, index = 0 }) {
     };
   }, [menuOpen]);
 
+  const hasBadges = (note.pinned && !note.trashed) || (note.favorite && !note.trashed);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, delay: index * 0.03 }}
-      whileHover={{ y: -4, scale: 1.01 }}
-      className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative group overflow-hidden hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/5 transition-shadow flex flex-col min-h-[200px]"
+      transition={{ duration: 0.2, delay: index * 0.025 }}
+      whileHover={{ y: -3, scale: 1.008 }}
+      className="h-full p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative group overflow-hidden hover:border-purple-500/25 hover:shadow-lg hover:shadow-purple-500/[0.06] transition-all duration-200 flex flex-col"
     >
       <div
-        className={`absolute top-0 right-0 w-28 h-28 bg-gradient-to-tr ${
+        className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-tr ${
           note.collectionColor ?? "from-purple-500/20 to-pink-500/10"
-        } blur-2xl opacity-25 group-hover:opacity-45 transition-opacity pointer-events-none`}
+        } blur-2xl opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none`}
       />
 
-      <div className="z-10 flex-1">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 shrink-0">
-            <FileText size={16} />
+      <div className="z-10 flex-1 min-w-0 flex flex-col gap-2">
+        {/* Header row: icon + title + badges */}
+        <div className="flex items-start gap-2.5 min-w-0">
+          <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 shrink-0 mt-0.5">
+            <FileText size={14} />
           </div>
-          <div className="flex flex-wrap items-center gap-1 justify-end">
-            {note.pinned && !note.trashed && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#4F8CFF]/15 border border-[#4F8CFF]/30 text-[8px] font-bold uppercase text-[#4F8CFF] rounded-full">
-                <Pin size={8} /> Pinned
-              </span>
-            )}
-            {note.favorite && !note.trashed && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/30 text-[8px] font-bold uppercase text-amber-400 rounded-full">
-                <Star size={8} /> Favorite
-              </span>
-            )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-sm font-bold text-white leading-snug line-clamp-2 flex-1 min-w-0">
+                {note.title}
+              </h3>
+              {hasBadges && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {note.pinned && !note.trashed && (
+                    <span className="inline-flex items-center p-1 rounded-md bg-[#4F8CFF]/15 border border-[#4F8CFF]/25 text-[#4F8CFF]" title="Pinned">
+                      <Pin size={10} />
+                    </span>
+                  )}
+                  {note.favorite && !note.trashed && (
+                    <span className="inline-flex items-center p-1 rounded-md bg-amber-500/15 border border-amber-500/25 text-amber-400" title="Favorite">
+                      <Star size={10} />
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-[#A0A6B1] leading-relaxed line-clamp-2 mt-1">
+              {note.description || "No description."}
+            </p>
           </div>
         </div>
 
-        <h3 className="text-sm font-bold text-white truncate mb-1">{note.title}</h3>
-        <p className="text-xs text-[#A0A6B1] line-clamp-2 mb-3">
-          {note.description || "No description."}
+        {/* Collection + tags row */}
+        <div className="flex flex-wrap items-center gap-1.5 min-h-[22px]">
+          {note.collectionName && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/[0.05] border border-white/[0.08] text-[9px] font-semibold text-purple-400 rounded-full shrink-0">
+              {note.collectionIcon && <span role="img" aria-hidden className="text-[10px]">{note.collectionIcon}</span>}
+              {note.collectionName}
+            </span>
+          )}
+          {(note.tags ?? []).slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              className="px-1.5 py-0.5 text-[9px] font-mono text-[#A0A6B1] bg-white/[0.04] border border-white/[0.06] rounded-md shrink-0"
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+
+        {/* Metadata */}
+        <p className="text-[10px] text-[#A0A6B1] leading-none mt-auto">
+          <span>{formatDate(note.createdAt)}</span>
+          <span className="mx-1.5 text-white/20">·</span>
+          <span>{formatRelativeTime(note.updatedAt)}</span>
+          <span className="mx-1.5 text-white/20">·</span>
+          <span className="font-mono">{note.readTime ?? 1}m</span>
         </p>
-
-        {note.collectionName && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/[0.05] border border-white/[0.08] text-[9px] font-bold text-purple-400 rounded-full mb-2">
-            {note.collectionIcon && <span role="img" aria-hidden>{note.collectionIcon}</span>}
-            {note.collectionName}
-          </span>
-        )}
-
-        {(note.tags ?? []).length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {(note.tags ?? []).slice(0, 4).map((tag) => (
-              <span
-                key={tag}
-                className="px-1.5 py-0.5 text-[9px] font-mono text-[#A0A6B1] bg-white/[0.04] border border-white/[0.06] rounded-md"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[#A0A6B1]">
-          <span>Created {formatDate(note.createdAt)}</span>
-          <span>Updated {formatRelativeTime(note.updatedAt)}</span>
-          <span className="font-mono">{note.readTime ?? 1} min read</span>
-        </div>
       </div>
 
-      <div className="flex items-center justify-between pt-3 mt-3 border-t border-white/[0.06] z-10">
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-white/[0.06] z-10 shrink-0">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             handlers.onOpen();
           }}
-          className="text-[11px] font-semibold text-purple-400 hover:underline flex items-center gap-1 cursor-pointer"
+          className="text-[11px] font-semibold text-purple-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
         >
-          Open <ArrowUpRight size={12} />
+          Open <ArrowUpRight size={11} />
         </button>
 
         <div className="relative" ref={menuRef}>

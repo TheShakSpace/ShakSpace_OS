@@ -1,6 +1,9 @@
 import { motion } from "motion/react";
 import { NOTE_SORT_OPTIONS, NOTE_FILTER_OPTIONS } from "../../utils/knowledgeHelpers";
 
+const selectClass = (height) =>
+  `appearance-none ${height} min-w-[108px] bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-xs text-white outline-none focus:border-purple-500/60 cursor-pointer shrink-0`;
+
 export default function KnowledgeFilters({
   sortBy,
   onSortChange,
@@ -9,18 +12,19 @@ export default function KnowledgeFilters({
   selectedTag,
   onTagChange,
   tags = [],
+  controlHeight = "h-10",
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="flex flex-wrap items-center gap-2"
+      className="flex flex-wrap md:flex-nowrap items-center gap-2 w-full md:w-auto md:shrink-0"
     >
       <select
         value={statusFilter}
         onChange={(e) => onStatusFilterChange(e.target.value)}
-        className="appearance-none bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-purple-500/60 cursor-pointer"
+        className={selectClass(controlHeight)}
       >
         {NOTE_FILTER_OPTIONS.map((opt) => (
           <option key={opt.id} value={opt.id} className="bg-[#14171C]">
@@ -32,7 +36,7 @@ export default function KnowledgeFilters({
       <select
         value={sortBy}
         onChange={(e) => onSortChange(e.target.value)}
-        className="appearance-none bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-purple-500/60 cursor-pointer"
+        className={selectClass(controlHeight)}
       >
         {NOTE_SORT_OPTIONS.map((opt) => (
           <option key={opt.id} value={opt.id} className="bg-[#14171C]">
@@ -45,7 +49,7 @@ export default function KnowledgeFilters({
         <select
           value={selectedTag}
           onChange={(e) => onTagChange(e.target.value)}
-          className="appearance-none bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-purple-500/60 cursor-pointer"
+          className={`${selectClass(controlHeight)} min-w-[96px] max-w-[140px]`}
         >
           <option value="" className="bg-[#14171C]">All Tags</option>
           {tags.map((tag) => (

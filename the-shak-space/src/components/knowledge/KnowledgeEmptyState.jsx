@@ -7,7 +7,7 @@ export default function KnowledgeEmptyState({ onCreate, isFiltered = false, view
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      className="col-span-full py-16 px-6 rounded-2xl border border-dashed border-white/[0.10] bg-white/[0.02] flex flex-col items-center text-center"
+      className="col-span-full py-12 px-6 rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] flex flex-col items-center text-center"
     >
       <motion.div
         animate={{ y: [0, -6, 0] }}

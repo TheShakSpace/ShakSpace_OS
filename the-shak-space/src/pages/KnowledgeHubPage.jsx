@@ -305,7 +305,7 @@ export default function KnowledgeHubPage() {
   }, [emptyTrash]);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto">
+    <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 max-w-7xl mx-auto">
       <KnowledgeSidebar
         activeView={activeView}
         activeCollectionId={activeCollectionId}
@@ -318,7 +318,7 @@ export default function KnowledgeHubPage() {
         trashCount={stats.trash}
       />
 
-      <div className="flex-1 min-w-0 space-y-6">
+      <div className="flex-1 min-w-0 space-y-4">
         <KnowledgeHero stats={stats} />
 
         <KnowledgeToolbar
@@ -345,18 +345,18 @@ export default function KnowledgeHubPage() {
         )}
 
         {activeView === SIDEBAR_VIEWS.ALL && !activeCollectionId && (
-          <>
+          <div className="space-y-4">
             <KnowledgePinned notes={pinnedNotes} makeHandlers={makeHandlers} />
             <KnowledgeRecent notes={recentNotes} makeHandlers={makeHandlers} />
-          </>
+          </div>
         )}
 
-        <section className="space-y-4">
+        <section className="space-y-2.5">
           {mainNotes.length > 0 && activeView === SIDEBAR_VIEWS.ALL && !activeCollectionId && (
-            <h2 className="text-sm font-black text-white">All Notes</h2>
+            <h2 className="text-sm font-black text-white tracking-tight">All Notes</h2>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr">
             {mainNotes.map((note, i) => (
               <KnowledgeCard
                 key={note.id}
@@ -387,13 +387,13 @@ export default function KnowledgeHubPage() {
                   type="button"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  whileHover={{ scale: 1.02, y: -4 }}
+                  whileHover={{ scale: 1.02, y: -3 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={openCreateNote}
-                  className="p-4 rounded-2xl border-2 border-dashed border-white/[0.08] hover:border-purple-500/50 hover:bg-white/[0.02] flex flex-col items-center justify-center text-center gap-2 min-h-[200px] transition-all cursor-pointer group"
+                  className="h-full min-h-[140px] p-3.5 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-purple-500/50 hover:bg-white/[0.02] flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer group"
                 >
-                  <div className="p-3 rounded-full bg-white/[0.04] text-[#A0A6B1] group-hover:text-white group-hover:scale-110 transition-all">
-                    <Plus size={20} />
+                  <div className="p-2.5 rounded-full bg-white/[0.04] text-[#A0A6B1] group-hover:text-white group-hover:scale-110 transition-all">
+                    <Plus size={18} />
                   </div>
                   <span className="text-xs font-bold text-white">New Note</span>
                 </motion.button>
