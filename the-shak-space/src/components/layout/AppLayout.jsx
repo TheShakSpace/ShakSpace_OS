@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   LayoutDashboard,
@@ -15,17 +15,11 @@ import {
   Sparkles,
   Clock,
   Briefcase,
-  Grid,
-  Plus,
-  ArrowUpRight,
   FileText,
-  Activity,
   Workflow,
-  ExternalLink,
-  Sliders,
-  Send,
-  Zap,
 } from "lucide-react";
+
+import { useAuthStore } from "../../stores/useAuthStore";
 
 const MENU_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -37,6 +31,11 @@ const MENU_ITEMS = [
 ];
 
 export default function AppLayout({ children }) {
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+
+  const navigate = useNavigate();
+
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -47,13 +46,44 @@ export default function AppLayout({ children }) {
   ]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
   // Local state kept to preserve sidebar/topbar UI behavior & animations exactly as before.
   // Page content now comes from {children}.
   const [workspaces, setWorkspaces] = useState([
-    { id: "1", name: "Acme Client space", items: 12, category: "Design", updated: "2m ago", color: "from-blue-500/20 to-indigo-500/10" },
-    { id: "2", name: "Product Design Hub", items: 8, category: "Product", updated: "45m ago", color: "from-purple-500/20 to-pink-500/10" },
-    { id: "3", name: "Marketing Collateral", items: 15, category: "Marketing", updated: "1d ago", color: "from-amber-500/20 to-orange-500/10" },
-    { id: "4", name: "Engineering Monorepo", items: 34, category: "Development", updated: "3d ago", color: "from-emerald-500/20 to-teal-500/10" },
+    {
+      id: "1",
+      name: "Acme Client space",
+      items: 12,
+      category: "Design",
+      updated: "2m ago",
+      color: "from-blue-500/20 to-indigo-500/10",
+    },
+    {
+      id: "2",
+      name: "Product Design Hub",
+      items: 8,
+      category: "Product",
+      updated: "45m ago",
+      color: "from-purple-500/20 to-pink-500/10",
+    },
+    {
+      id: "3",
+      name: "Marketing Collateral",
+      items: 15,
+      category: "Marketing",
+      updated: "1d ago",
+      color: "from-amber-500/20 to-orange-500/10",
+    },
+    {
+      id: "4",
+      name: "Engineering Monorepo",
+      items: 34,
+      category: "Development",
+      updated: "3d ago",
+      color: "from-emerald-500/20 to-teal-500/10",
+    },
   ]);
 
   const [notes, setNotes] = useState([
@@ -63,9 +93,9 @@ export default function AppLayout({ children }) {
   ]);
 
   const [logs, setLogs] = useState([
-    { id: 1, user: "Shak", action: "modified workspace description", target: "Acme Client Space", time: "10 min ago", icon: Briefcase },
-    { id: 2, user: "Shak Space Assistant", action: "optimized prompt performance", target: "Knowledge Synthesizer", time: "30 min ago", icon: Sparkles },
-    { id: 3, user: "Agent Runner", action: "triggered workflow", target: "Sync Notes -> Slack", time: "2 hrs ago", icon: Workflow },
+    { id: 1, user: "Shak", action: "modified workspace description", target: "Acme Client Space", time: "10 min ago" },
+    { id: 2, user: "Shak Space Assistant", action: "optimized prompt performance", target: "Knowledge Synthesizer", time: "30 min ago" },
+    { id: 3, user: "Agent Runner", action: "triggered workflow", target: "Sync Notes -> Slack", time: "2 hrs ago" },
   ]);
 
   const [aiInput, setAiInput] = useState("");
@@ -84,6 +114,33 @@ export default function AppLayout({ children }) {
     { id: 2, name: "Weekly Workspace Summary PDF", trigger: "Every Friday at 5 PM", action: "Generate Document & Email", active: true },
     { id: 3, name: "Sync Notes to GitHub Gist", trigger: "On Note Created", action: "Trigger REST Endpoint", active: false },
   ]);
+
+  const userDisplayName = useMemo(() => user?.name || "Guest", [user?.name]);
+  const userDisplayEmail = useMemo(() => user?.email || "guest@example.com", [user?.email]);
+  const userInitial = useMemo(() => user?.name?.charAt(0)?.toUpperCase() || "G", [user?.name]);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+
+    const onPointerDown = (e) => {
+      const el = profileRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && el.contains(e.target)) return;
+      setIsProfileOpen(false);
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setIsProfileOpen(false);
+    };
+
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isProfileOpen]);
 
   const handleAddNewWorkspace = () => {
     const names = ["Aperture Science Hub", "Vector Sync Platform", "Black Mesa Portal", "Oasis Sandbox"];
@@ -104,7 +161,7 @@ export default function AppLayout({ children }) {
       color: colors[index],
     };
     setWorkspaces([newWs, ...workspaces]);
-    setLogs((prev) => [{ id: Date.now(), user: "Shak", action: "created new workspace", target: newWs.name, time: "Just now", icon: Briefcase }, ...prev.slice(0, 5)]);
+    setLogs((prev) => [{ id: Date.now(), user: "Shak", action: "created new workspace", target: newWs.name, time: "Just now" }, ...prev.slice(0, 5)]);
   };
 
   const handleAddNewNote = () => {
@@ -122,7 +179,7 @@ export default function AppLayout({ children }) {
       duration: `${Math.floor(Math.random() * 8) + 2} min read`,
     };
     setNotes([newNote, ...notes]);
-    setLogs((prev) => [{ id: Date.now(), user: "Shak", action: "drafted high-fidelity note", target: title, time: "Just now", icon: FileText }, ...prev.slice(0, 5)]);
+    setLogs((prev) => [{ id: Date.now(), user: "Shak", action: "drafted high-fidelity note", target: title, time: "Just now" }, ...prev.slice(0, 5)]);
   };
 
   const askAiSimulation = (queryText) => {
@@ -148,6 +205,11 @@ export default function AppLayout({ children }) {
       setAiMessages((prev) => [...prev, { id: Date.now() + 1, role: "assistant", content: reply }]);
       setIsAiTyping(false);
     }, 1000);
+  };
+
+  const onLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
   };
 
   return (
@@ -262,7 +324,9 @@ export default function AppLayout({ children }) {
               <Sparkles size={14} />
               <span className="text-[11px] font-bold tracking-wider uppercase">V-System Engine</span>
             </div>
-            <p className="text-[11px] text-[#A0A6B1] leading-relaxed">Fully customized UI components, running locally. System health is optimal.</p>
+            <p className="text-[11px] text-[#A0A6B1] leading-relaxed">
+              Fully customized UI components, running locally. System health is optimal.
+            </p>
           </div>
         )}
       </aside>
@@ -316,7 +380,10 @@ export default function AppLayout({ children }) {
                   >
                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-[rgba(255,255,255,0.06)]">
                       <h4 className="text-xs font-semibold text-white">Notifications</h4>
-                      <button onClick={() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))} className="text-[10px] text-[#4F8CFF] hover:underline">
+                      <button
+                        onClick={() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))) }
+                        className="text-[10px] text-[#4F8CFF] hover:underline"
+                      >
                         Mark all read
                       </button>
                     </div>
@@ -336,9 +403,141 @@ export default function AppLayout({ children }) {
               </AnimatePresence>
             </div>
 
-            <div className="flex items-center gap-2.5 px-3 py-1.5 bg-white/[0.04] border border-[rgba(255,255,255,0.08)] rounded-xl">
-              <span className="text-xs font-semibold font-mono text-white">shak_space</span>
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#4F8CFF] to-[#80AAFF] text-[10px] text-white flex items-center justify-center font-bold shadow-md">SK</div>
+            {/* Profile dropdown */}
+            <div ref={profileRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsProfileOpen((v) => !v)}
+                className="flex items-center gap-2.5 px-3 py-1.5 bg-white/[0.04] border border-[rgba(255,255,255,0.08)] rounded-xl cursor-pointer hover:bg-white/[0.07] transition-all"
+                aria-haspopup="menu"
+                aria-expanded={isProfileOpen}
+              >
+                <span className="text-xs font-semibold font-mono text-white truncate max-w-[120px]">{userDisplayName}</span>
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#4F8CFF] to-[#80AAFF] text-[10px] text-white flex items-center justify-center font-bold shadow-md">
+                  {userInitial}
+                </div>
+              </button>
+
+              <AnimatePresence>
+                {isProfileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute right-0 mt-2 w-[332px] rounded-3xl border border-[rgba(255,255,255,0.10)] bg-[#14171C]/55 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.45)] overflow-hidden z-50"
+                    role="menu"
+                  >
+                    {/* Top / identity */}
+                    <div className="px-5 pt-5 pb-4">
+                      <div className="flex flex-col items-center text-center gap-2">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#4F8CFF] to-[#80AAFF] flex items-center justify-center text-[12px] text-white font-bold shadow-md shadow-[#4F8CFF]/20">
+                          {userInitial}
+                        </div>
+                        <div className="leading-tight">
+                          <div className="text-[15px] font-semibold text-white">{userDisplayName}</div>
+                          <div className="text-[11px] text-[#A0A6B1] mt-1">{userDisplayEmail}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-[rgba(255,255,255,0.07)]" />
+
+                    {/* Rows */}
+                    <div className="p-2.5">
+                      <NavLink
+                        to="/profile"
+                        onClick={() => setIsProfileOpen(false)}
+                        className={({ isActive }) =>
+                          `group flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 hover:bg-white/5 hover:scale-[1.01] ${
+                            isActive ? "bg-white/5" : ""
+                          }`
+                        }
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Lucide icon */}
+                          <span className="w-[18px] h-[18px] inline-flex items-center justify-center text-[#A0A6B1] group-hover:text-[#4F8CFF]">
+                            👤
+                          </span>
+                          <span className="text-[13px] font-medium text-white">My Profile</span>
+                        </div>
+                        <ChevronRight size={18} className="text-[#A0A6B1] group-hover:text-white transition-colors" />
+                      </NavLink>
+
+                      <NavLink
+                        to="/workspaces"
+                        onClick={() => setIsProfileOpen(false)}
+                        className={({ isActive }) =>
+                          `group flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 hover:bg-white/5 hover:scale-[1.01] ${
+                            isActive ? "bg-white/5" : ""
+                          }`
+                        }
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-[18px] h-[18px] inline-flex items-center justify-center text-[#A0A6B1] group-hover:text-[#4F8CFF]">
+                            📂
+                          </span>
+                          <span className="text-[13px] font-medium text-white">My Workspaces</span>
+                        </div>
+                        <ChevronRight size={18} className="text-[#A0A6B1] group-hover:text-white transition-colors" />
+                      </NavLink>
+
+                      <NavLink
+                        to="/settings"
+                        onClick={() => setIsProfileOpen(false)}
+                        className={({ isActive }) =>
+                          `group flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 hover:bg-white/5 hover:scale-[1.01] ${
+                            isActive ? "bg-white/5" : ""
+                          }`
+                        }
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-[18px] h-[18px] inline-flex items-center justify-center text-[#A0A6B1] group-hover:text-[#4F8CFF]">
+                            ⚙
+                          </span>
+                          <span className="text-[13px] font-medium text-white">Settings</span>
+                        </div>
+                        <ChevronRight size={18} className="text-[#A0A6B1] group-hover:text-white transition-colors" />
+                      </NavLink>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                        }}
+                        className="group flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 hover:bg-white/5 hover:scale-[1.01] w-full"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-[18px] h-[18px] inline-flex items-center justify-center text-[#A0A6B1] group-hover:text-[#4F8CFF]">
+                            🌙
+                          </span>
+                          <span className="text-[13px] font-medium text-white">Appearance</span>
+                        </div>
+                        <ChevronRight size={18} className="text-[#A0A6B1] group-hover:text-white transition-colors" />
+                      </button>
+                    </div>
+
+                    <div className="h-px bg-[rgba(255,255,255,0.07)]" />
+
+                    {/* Logout */}
+                    <div className="p-2.5">
+                      <button
+                        type="button"
+                        onClick={onLogout}
+                        className="w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 bg-transparent hover:bg-red-500/10 hover:scale-[1.01]"
+                        role="menuitem"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-[18px] h-[18px] inline-flex items-center justify-center text-red-400 group-hover:text-red-300">
+                            🚪
+                          </span>
+                          <span className="text-[13px] font-medium text-red-300">Logout</span>
+                        </div>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </header>

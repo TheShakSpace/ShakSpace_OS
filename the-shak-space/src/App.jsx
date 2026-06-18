@@ -12,6 +12,8 @@ import AIAssistantPage from "./pages/AIAssistantPage";
 import AutomationPage from "./pages/AutomationPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
+import ProfilePage from "./pages/ProfilePage";
+
 
 
 function App() {
@@ -94,6 +96,17 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <SettingsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ProfilePage />
             </AppLayout>
           </ProtectedRoute>
         }
