@@ -7,6 +7,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 import DashboardPage from "./pages/DashboardPage";
 import WorkspacesPage from "./pages/WorkspacePage";
+import WorkspaceDetailsPage from "./pages/WorkspaceDetailsPage";
 import KnowledgeHubPage from "./pages/KnowledgeHubPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import AutomationPage from "./pages/AutomationPage";
@@ -52,6 +53,17 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <WorkspacesPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/workspace/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <WorkspaceDetailsPage />
             </AppLayout>
           </ProtectedRoute>
         }
