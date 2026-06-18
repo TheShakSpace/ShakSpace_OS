@@ -1,143 +1,285 @@
-import React from "react";
-import { Bot, Send } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { useAIStore } from "../stores/useAIStore";
+import {
+  searchConversations,
+  getConversationStats,
+  generateMockResponse,
+  generateId,
+} from "../utils/aiHelpers";
+
+import AIHero from "../components/ai/AIHero";
+import ConversationSidebar from "../components/ai/ConversationSidebar";
+import ConversationHeader from "../components/ai/ConversationHeader";
+import ChatWindow from "../components/ai/ChatWindow";
+import ChatInput from "../components/ai/ChatInput";
 
 export default function AIAssistantPage() {
-  // Temporary local mock state (AppContext removed to prevent crash)
-  const [aiInput, setAiInput] = React.useState("");
-  const [aiMessages, setAiMessages] = React.useState([
-    {
-      id: "m1",
-      role: "ai",
-      content:
-        "Ready. This is a temporary assistant view until AppContext is wired.",
+  const conversations = useAIStore((s) => s.conversations);
+  const activeConversationId = useAIStore((s) => s.activeConversationId);
+  const isGenerating = useAIStore((s) => s.isGenerating);
+
+  const createConversation = useAIStore((s) => s.createConversation);
+  const setActiveConversation = useAIStore((s) => s.setActiveConversation);
+  const renameConversation = useAIStore((s) => s.renameConversation);
+  const deleteConversation = useAIStore((s) => s.deleteConversation);
+  const togglePinConversation = useAIStore((s) => s.togglePinConversation);
+  const toggleFavoriteConversation = useAIStore((s) => s.toggleFavoriteConversation);
+  const archiveConversation = useAIStore((s) => s.archiveConversation);
+  const restoreConversation = useAIStore((s) => s.restoreConversation);
+  const setConversationModel = useAIStore((s) => s.setConversationModel);
+  const addMessage = useAIStore((s) => s.addMessage);
+  const updateMessage = useAIStore((s) => s.updateMessage);
+  const deleteMessage = useAIStore((s) => s.deleteMessage);
+  const appendToMessage = useAIStore((s) => s.appendToMessage);
+  const setIsGenerating = useAIStore((s) => s.setIsGenerating);
+
+  const [search, setSearch] = useState("");
+  const [sidebarFilter, setSidebarFilter] = useState("all");
+  const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState([]);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [isThinking, setIsThinking] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState(null);
+
+  const abortRef = useRef(false);
+  const streamTimerRef = useRef(null);
+
+  const stats = useMemo(() => getConversationStats(conversations), [conversations]);
+
+  const filteredConversations = useMemo(() => {
+    let list = searchConversations(conversations, search);
+    if (sidebarFilter === "archived") list = list.filter((c) => c.archived);
+    else list = list.filter((c) => !c.archived);
+    return list;
+  }, [conversations, search, sidebarFilter]);
+
+  const activeConversation = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId),
+    [conversations, activeConversationId]
+  );
+
+  const stopGeneration = useCallback(() => {
+    abortRef.current = true;
+    if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+    setIsGenerating(false);
+    setIsThinking(false);
+    setStreamingMessageId(null);
+  }, [setIsGenerating]);
+
+  const streamResponse = useCallback(
+    (conversationId, assistantMsgId, fullText) => {
+      setIsGenerating(true);
+      setStreamingMessageId(assistantMsgId);
+      abortRef.current = false;
+
+      let index = 0;
+
+      const tick = () => {
+        if (abortRef.current) {
+          setIsGenerating(false);
+          setStreamingMessageId(null);
+          return;
+        }
+
+        if (index >= fullText.length) {
+          setIsGenerating(false);
+          setStreamingMessageId(null);
+          return;
+        }
+
+        const char = fullText[index];
+        const chunkSize =
+          char === "\n" ? 1 : char === " " ? 2 : /[.!?]/.test(char) ? 3 : Math.random() > 0.7 ? 2 : 1;
+        const chunk = fullText.slice(index, index + chunkSize);
+        index += chunkSize;
+        appendToMessage(conversationId, assistantMsgId, chunk);
+
+        const delay = /[.!?\n]/.test(char) ? 28 : char === " " ? 8 : 12 + Math.random() * 8;
+        streamTimerRef.current = setTimeout(tick, delay);
+      };
+
+      streamTimerRef.current = setTimeout(tick, 40);
     },
-  ]);
-  const [isAiTyping, setIsAiTyping] = React.useState(false);
+    [appendToMessage, setIsGenerating]
+  );
 
-  const askAiSimulation = () => {
-    const trimmed = aiInput.trim();
-    if (!trimmed) return;
+  const sendMessage = useCallback(
+    async (text) => {
+      const content = (text ?? input).trim();
+      if (!content && !attachments.length) return;
 
-    const userMsg = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      content: trimmed,
-    };
+      let convId = activeConversationId;
+      if (!convId) {
+        convId = createConversation();
+      }
 
-    setAiMessages((prev) => [...prev, userMsg]);
-    setAiInput("");
-    setIsAiTyping(true);
+      if (editingMessage) {
+        updateMessage(convId, editingMessage.id, {
+          content,
+          attachments: [...attachments],
+        });
+        setEditingMessage(null);
+        setInput("");
+        setAttachments([]);
+        return;
+      }
 
-    // Preserve the existing UI/animation expectations without redesign.
-    setTimeout(() => {
-      setAiMessages((prev) => [
-        ...prev,
-        {
-          id: `a-${Date.now()}`,
-          role: "ai",
-          content:
-            "Simulation complete. AppContext is currently unavailable, so this is a placeholder response.",
-        },
-      ]);
-      setIsAiTyping(false);
-    }, 800);
-  };
+      addMessage(convId, {
+        role: "user",
+        content,
+        attachments: [...attachments],
+      });
+
+      setInput("");
+      setAttachments([]);
+
+      setIsThinking(true);
+      setIsGenerating(true);
+
+      await new Promise((r) => setTimeout(r, 600));
+      if (abortRef.current) return;
+
+      setIsThinking(false);
+
+      const model = activeConversation?.model ?? "gpt";
+      const response = generateMockResponse(content, model);
+      const assistantId = generateId();
+
+      addMessage(convId, { id: assistantId, role: "assistant", content: "" });
+      streamResponse(convId, assistantId, response);
+    },
+    [
+      input,
+      attachments,
+      activeConversationId,
+      activeConversation,
+      editingMessage,
+      createConversation,
+      addMessage,
+      updateMessage,
+      streamResponse,
+      setIsGenerating,
+    ]
+  );
+
+  const handleRegenerate = useCallback(
+    (assistantMsgId) => {
+      if (!activeConversationId || !activeConversation) return;
+      const idx = activeConversation.messages.findIndex((m) => m.id === assistantMsgId);
+      if (idx <= 0) return;
+
+      const userMsg = activeConversation.messages[idx - 1];
+      if (userMsg?.role !== "user") return;
+
+      deleteMessage(activeConversationId, assistantMsgId);
+
+      setIsThinking(true);
+      setTimeout(() => {
+        setIsThinking(false);
+        const response = generateMockResponse(userMsg.content, activeConversation.model);
+        const assistantId = generateId();
+        addMessage(activeConversationId, { id: assistantId, role: "assistant", content: "" });
+        streamResponse(activeConversationId, assistantId, response);
+      }, 500);
+    },
+    [activeConversationId, activeConversation, deleteMessage, addMessage, streamResponse]
+  );
+
+  const handleRenameHeader = useCallback(() => {
+    if (!activeConversation) return;
+    const title = window.prompt("Rename conversation", activeConversation.title);
+    if (title) renameConversation(activeConversation.id, title);
+  }, [activeConversation, renameConversation]);
+
+  const handleDeleteConv = useCallback(() => {
+    if (!activeConversation) return;
+    const ok = window.confirm("Delete this conversation?");
+    if (!ok) return;
+    deleteConversation(activeConversation.id);
+  }, [activeConversation, deleteConversation]);
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto h-[calc(100vh-140px)] flex flex-col justify-between">
-      <div className="border-b border-white/[0.08] pb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Bot size={20} className="text-[#4F8CFF]" />
-            AI Intelligent Synthesizer
-          </h1>
-          <p className="text-[11px] text-[#A0A6B1]">
-            Instruct your local space agent to trigger actions and index logs
-          </p>
-        </div>
-        <span className="text-[10px] font-mono bg-[#4F8CFF]/10 text-[#4F8CFF] px-2 py-0.5 rounded border border-[#4F8CFF]/20">
-          Gemini 2.5 Flash Online
-        </span>
-      </div>
+    <div className="flex flex-col gap-3 max-w-7xl mx-auto h-[calc(100vh-120px)] min-h-[520px]">
+      <AIHero stats={stats} />
 
-      {/* Message Log */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] custom-scrollbar">
-        {aiMessages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex gap-3 max-w-[85%] ${
-              msg.role === "user" ? "ml-auto flex-row-reverse" : ""
-            }`}
-          >
-            <div
-              className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center font-bold text-[10px] ${
-                msg.role === "user"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-[#4F8CFF] text-white"
-              }`}
-            >
-              {msg.role === "user" ? "SH" : "AI"}
-            </div>
-            <div
-              className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-[#4F8CFF] text-white"
-                  : "bg-[#14171C] text-white/90 border border-white/[0.04]"
-              }`}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-
-        {isAiTyping && (
-          <div className="flex gap-3 max-w-[85%]">
-            <div className="w-7 h-7 rounded-lg bg-[#4F8CFF] text-white shrink-0 flex items-center justify-center font-bold text-[10px]">
-              AI
-            </div>
-            <div className="p-3 bg-[#14171C] text-[#A0A6B1] border border-white/[0.04] rounded-2xl text-[11px] flex items-center gap-2">
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-[#A0A6B1] animate-bounce"
-                style={{ animationDelay: "0ms" }}
-              />
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-[#A0A6B1] animate-bounce"
-                style={{ animationDelay: "150ms" }}
-              />
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-[#A0A6B1] animate-bounce"
-                style={{ animationDelay: "300ms" }}
-              />
-              <span>Indexing workspaces filesystem...</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Console Input Bar */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          askAiSimulation();
-        }}
-        className="flex items-center gap-3 p-2 bg-white/[0.04] border border-white/[0.08] rounded-2xl shrink-0"
-      >
-        <input
-          id="ai-console-input"
-          type="text"
-          placeholder="Type your instruction or try: 'index my recent workspaces'..."
-          value={aiInput}
-          onChange={(e) => setAiInput(e.target.value)}
-          className="flex-1 bg-transparent px-3 text-xs outline-none text-white placeholder-white/30"
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 flex-1 min-h-0">
+        <ConversationSidebar
+          conversations={filteredConversations}
+          activeId={activeConversationId}
+          search={search}
+          onSearchChange={setSearch}
+          filter={sidebarFilter}
+          onFilterChange={setSidebarFilter}
+          onSelect={setActiveConversation}
+          onNewChat={() => {
+            stopGeneration();
+            createConversation();
+            setInput("");
+            setAttachments([]);
+            setEditingMessage(null);
+          }}
+          onRename={renameConversation}
+          onDelete={(id) => {
+            const ok = window.confirm("Delete this conversation?");
+            if (ok) deleteConversation(id);
+          }}
+          onTogglePin={togglePinConversation}
+          onToggleFavorite={toggleFavoriteConversation}
+          onArchive={archiveConversation}
+          onRestore={restoreConversation}
         />
-        <button
-          type="submit"
-          className="p-2 rounded-xl bg-[#4F8CFF] hover:bg-blue-600 text-white cursor-pointer transition-transform shrink-0"
+
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col min-w-0 min-h-0 gap-2.5 rounded-2xl border border-white/[0.06] bg-white/[0.015] backdrop-blur-sm overflow-hidden p-2.5 sm:p-3"
         >
-          <Send size={14} />
-        </button>
-      </form>
+          <ConversationHeader
+            conversation={activeConversation}
+            model={activeConversation?.model ?? "gpt"}
+            onModelChange={(m) => activeConversationId && setConversationModel(activeConversationId, m)}
+            onRename={handleRenameHeader}
+            onTogglePin={() => activeConversationId && togglePinConversation(activeConversationId)}
+            onToggleFavorite={() => activeConversationId && toggleFavoriteConversation(activeConversationId)}
+            onArchive={() => activeConversationId && archiveConversation(activeConversationId)}
+            onDelete={handleDeleteConv}
+            isGenerating={isGenerating}
+          />
+
+          <ChatWindow
+            conversation={activeConversation}
+            isGenerating={isGenerating}
+            isThinking={isThinking}
+            streamingMessageId={streamingMessageId}
+            onSelectPrompt={(prompt) => {
+              setInput(prompt);
+              sendMessage(prompt);
+            }}
+            onEditMessage={(msg) => {
+              setEditingMessage(msg);
+              setInput(msg.content);
+            }}
+            onDeleteMessage={(msgId) => activeConversationId && deleteMessage(activeConversationId, msgId)}
+            onRegenerate={handleRegenerate}
+          />
+
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={() => sendMessage()}
+            onStop={stopGeneration}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            isGenerating={isGenerating}
+            editingMessage={editingMessage}
+            onCancelEdit={() => {
+              setEditingMessage(null);
+              setInput("");
+            }}
+          />
+        </motion.div>
+      </div>
     </div>
   );
 }
-
