@@ -15,10 +15,19 @@ import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 
+import { useAuthStore } from "./stores/useAuthStore";
+
 
 
 function App() {
   const [loading, setLoading] = useState(true);
+  const restoreSession = useAuthStore((state) => state.restoreSession);
+  const authLoading = useAuthStore((state) => state.authLoading);
+
+  useEffect(() => {
+    // Restore cookie session immediately on app start.
+    restoreSession();
+  }, [restoreSession]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -28,9 +37,10 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (loading) {
+  if (loading || authLoading) {
     return <SplashScreen />;
   }
+
 
   return (
     <Routes>

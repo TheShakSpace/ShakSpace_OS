@@ -27,6 +27,8 @@ export default function LoginPage() {
 
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const login = useAuthStore((state) => state.login);
+  const authLoading = useAuthStore((state) => state.authLoading);
+  const validationError = useAuthStore((state) => state.validationError);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -35,13 +37,13 @@ export default function LoginPage() {
   const [typedLine, setTypedLine] = React.useState("");
   const [lineIndex, setLineIndex] = React.useState(0);
 
-  const handleLogin = () => {
-    login({
-      email,
-      name: "Shakshi",
-    });
-
-    navigate("/");
+  const handleLogin = async () => {
+    try {
+      await login({ email, password });
+      navigate("/");
+    } catch {
+      // backend validation errors are already stored in Zustand
+    }
   };
 
 
@@ -281,11 +283,26 @@ export default function LoginPage() {
                       </button>
                     </div>
 
+                    {validationError ? (
+                      <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-[12px] text-red-200">
+                        {Array.isArray(validationError)
+                          ? validationError.map((m, idx) => (
+                              <div key={idx}>{String(m)}</div>
+                            ))
+                          : typeof validationError === "object"
+                          ? Object.values(validationError).map((v, idx) => (
+                              <div key={idx}>{String(v)}</div>
+                            ))
+                          : String(validationError)}
+                      </div>
+                    ) : null}
+
                     <button
                       type="submit"
+                      disabled={authLoading}
                       className="w-full px-4 py-2.5 rounded-xl text-sm bg-[#4F8CFF] text-white hover:brightness-110 transition-all cursor-pointer disabled:opacity-60"
                     >
-                      Login
+                      {authLoading ? "Logging in..." : "Login"}
                     </button>
 
                     <button

@@ -1,7 +1,12 @@
 const dotenv = require('dotenv');
+const path = require('path');
 const process = require('process');
 
-dotenv.config();
+// Load .env deterministically from the backend root.
+// This avoids issues when the process cwd differs (e.g., monorepo tooling).
+const envPath = path.resolve(__dirname, '..', '..', '.env');
+dotenv.config({ path: envPath });
+
 
 function required(name) {
   const v = process.env[name];
