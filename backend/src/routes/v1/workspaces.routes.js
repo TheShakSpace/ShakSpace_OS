@@ -21,33 +21,33 @@ const router = Router();
 
 
 
-// Auth must remain unchanged
-router.use(authJwt(false));
+router.use(authJwt(true));
 
-console.log('[workspaces.routes] router mounted');
-
-
-// Stats must be before '/:workspaceId' style routes to avoid conflicts
 router.get(
-  '/stats',
-  (req, res, next) => {
-    console.log('[workspaces.routes] before controller.stats');
-    next();
-  },
-  workspaceStats(),
+  "/",
+  ...workspaceList(),
   validateRequest,
-  workspacesController.stats
+  workspacesController.list
 );
 
-router.get('/', (req, res) => {
-  console.log('WORKSPACES ROUTE HIT');
-  return res.status(200).json({
-    success: true,
-    message: 'Route works'
-  });
-});
-
-router.post('/', ...workspaceCreate(), validateRequest, workspacesController.create);
+router.post(
+  "/",
+  (req, res, next) => {
+    console.log("POST ROUTE ENTERED");
+    next();
+  },
+  ...workspaceCreate(),
+  (req, res, next) => {
+    console.log("POST VALIDATION PASSED");
+    next();
+  },
+  validateRequest,
+  (req, res, next) => {
+    console.log("POST BEFORE CONTROLLER");
+    next();
+  },
+  workspacesController.create
+);
 
 router.get('/:workspaceId', ...workspaceGet(), validateRequest, workspacesController.getById);
 
@@ -60,6 +60,7 @@ router.patch('/:workspaceId/favorite', ...workspaceFavorite(), validateRequest, 
 router.patch('/:workspaceId/archive', ...workspaceArchive(), validateRequest, workspacesController.archive);
 router.patch('/:workspaceId/restore', ...workspaceRestore(), validateRequest, workspacesController.restore);
 router.patch('/:workspaceId/open', ...workspaceOpen(), validateRequest, workspacesController.open);
+
 
 module.exports = router;
 
