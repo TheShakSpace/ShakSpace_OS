@@ -28,10 +28,12 @@ function authJwt(required = true) {
       const payload = jwt.verify(token, env.jwt.accessSecret);
       // expected payload: { sub: userId, roles: [...] }
       req.user = {
+        // jwt controller uses: payload.sub = String(user._id)
         id: payload.sub,
-        roles: payload.roles || [],
+        roles: payload.roles || payload.role || [],
         tokenJti: payload.jti,
       };
+
 
       return next();
     } catch (err) {

@@ -96,8 +96,9 @@ async function login(req, res, next) {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+passwordHash');
     if (!user) throw new AppError('Invalid credentials', { statusCode: 401, code: 'INVALID_CREDENTIALS' });
+
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new AppError('Invalid credentials', { statusCode: 401, code: 'INVALID_CREDENTIALS' });
@@ -206,5 +207,32 @@ async function logout(req, res, next) {
   }
 }
 
-module.exports = { register, login, refresh, logout };
+async function me(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('Unauthorized', { statusCode: 401, code: 'UNAUTHORIZED' });
+    }
+
+    const user = await User.findById(userId).select('email name roles avatarUrl');
+    if (!user) {
+      throw new AppError('Unauthorized', { statusCode: 401, code: 'UNAUTHORIZED' });
+    }
+
+    return success(res, {
+      user: {
+        id: String(user._id),
+        email: user.email,
+        name: user.name,
+        roles: user.roles,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { register, login, refresh, logout, me };
+
 

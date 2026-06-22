@@ -43,5 +43,10 @@ router.post('/refresh', (req, res, next) => authController.refresh(req, res, nex
 
 router.post('/logout', (req, res, next) => authController.logout(req, res, next));
 
+const { authJwt } = require('../../middleware/authJwt');
+
+router.get('/me', authJwt(), (req, res, next) => authController.me(req, res, next));
+
 module.exports = router;
+
 
