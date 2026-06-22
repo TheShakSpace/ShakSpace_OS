@@ -28,7 +28,15 @@ function buildWorkspaceSearchQuery(q) {
 }
 
 async function listWorkspaces({ ownerId, page, limit, q, sortBy, sortOrder, category, pinnedOnly, favoriteOnly, archivedOnly }) {
+  console.log('[workspaces.service] entering listWorkspaces()');
+  // Ensure we always return a resolved promise (no hanging cursors).
   const skip = (page - 1) * limit;
+
+
+  // Safety: prevent pathological queries from hanging in Mongo.
+  // (Also guarantees we never return a never-resolving promise.)
+  if (!ownerId) throw new AppError('Unauthorized', { statusCode: 401, code: 'UNAUTHORIZED' });
+
 
   const query = {
     owner: ownerId,
@@ -43,16 +51,28 @@ async function listWorkspaces({ ownerId, page, limit, q, sortBy, sortOrder, cate
 
   const sort = buildWorkspaceSort(sortBy, sortOrder);
 
+  console.log('[workspaces.service] before Workspace.countDocuments()');
   const [total, items] = await Promise.all([
-    Workspace.countDocuments(query),
-    Workspace.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .lean(),
+    Workspace.countDocuments(query).then((r) => {
+      console.log('[workspaces.service] after countDocuments()');
+      return r;
+    }),
+    (async () => {
+      console.log('[workspaces.service] before Workspace.find()');
+      const res = await Workspace.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec();
+      console.log('[workspaces.service] after Workspace.find()');
+      return res;
+    })(),
   ]);
 
+  console.log('[workspaces.service] before return');
   return {
+
     items,
     pagination: {
       total,
@@ -62,6 +82,7 @@ async function listWorkspaces({ ownerId, page, limit, q, sortBy, sortOrder, cate
     },
   };
 }
+
 
 async function getWorkspace({ ownerId, workspaceId }) {
   const workspace = await getWorkspaceOrThrow({ ownerId, workspaceId });

@@ -14,8 +14,12 @@ function parseBoolean(val) {
 
 async function list(req, res, next) {
   try {
+    console.log('[workspaces.controller] entering list()');
+
     validateRequest(req);
+
     const ownerId = req.user.id;
+
 
     const page = Math.max(1, Number(req.query.page || 1));
     const limitRaw = Number(req.query.limit || 20);
@@ -32,8 +36,11 @@ async function list(req, res, next) {
     const favoriteOnly = parseBoolean(req.query.favoriteOnly);
     const archivedOnly = parseBoolean(req.query.archivedOnly);
 
+
+    console.log('[workspaces.controller] before listWorkspaces()');
     const result = await workspacesService.listWorkspaces({
       ownerId,
+
       page,
       limit,
       q,
@@ -44,9 +51,17 @@ async function list(req, res, next) {
       favoriteOnly,
       archivedOnly,
     });
+    console.log('[workspaces.controller] after listWorkspaces()');
 
-    return success(res, result);
+    const resp = success(res, result);
+    console.log('[workspaces.controller] before success() send');
+
+
+    return resp;
+
+
   } catch (e) {
+
     return next(e);
   }
 }

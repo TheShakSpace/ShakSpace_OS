@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { motion } from "motion/react";
 import { Plus } from "lucide-react";
 
@@ -26,6 +27,8 @@ export default function WorkspacesPage() {
   const navigate = useNavigate();
 
   const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const fetchWorkspaces = useWorkspaceStore((state) => state.fetchWorkspaces);
+
   const addWorkspace = useWorkspaceStore((state) => state.addWorkspace);
   const deleteWorkspace = useWorkspaceStore((state) => state.deleteWorkspace);
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
@@ -47,7 +50,13 @@ export default function WorkspacesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
 
+  useEffect(() => {
+    fetchWorkspaces().catch(() => {});
+  }, [fetchWorkspaces]);
+
   const stats = useMemo(() => getWorkspaceStats(workspaces), [workspaces]);
+
+
 
   const filteredWorkspaces = useMemo(() => {
     const searched = searchWorkspaces(workspaces, search);
@@ -103,6 +112,7 @@ export default function WorkspacesPage() {
         : [],
     [workspaces, search, statusFilter]
   );
+
 
   const closeModal = useCallback(() => {
     setIsModalOpen(false);

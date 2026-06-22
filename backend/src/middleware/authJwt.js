@@ -19,14 +19,26 @@ function extractTokenFromRequest(req) {
 function authJwt(required = true) {
   return (req, res, next) => {
     try {
+      console.log('[authJwt] before extracting token');
+
       const token = extractTokenFromRequest(req);
+
+      console.log('[authJwt] after extracting token:', Boolean(token));
+
       if (!token) {
+
+
         if (!required) return next();
         throw new AppError('Unauthorized', { statusCode: 401, code: 'UNAUTHORIZED' });
       }
 
+
       const payload = jwt.verify(token, env.jwt.accessSecret);
+      console.log('[authJwt] after jwt.verify');
+
       // expected payload: { sub: userId, roles: [...] }
+
+
       req.user = {
         // jwt controller uses: payload.sub = String(user._id)
         id: payload.sub,
@@ -35,8 +47,10 @@ function authJwt(required = true) {
       };
 
 
+      console.log('[authJwt] before next()');
       return next();
     } catch (err) {
+
       if (!required) return next();
       return next(new AppError('Unauthorized', { statusCode: 401, code: 'UNAUTHORIZED' }));
     }
