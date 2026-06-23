@@ -1,19 +1,28 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Pin, Star } from "lucide-react";
 import { useKnowledgeStore } from "../../stores/useKnowledgeStore";
+import { useAuthStore } from "../../stores/useAuthStore";
 import { formatRelativeTime, normalizeId } from "../../utils/knowledgeHelpers";
 
 export default function WorkspaceKnowledgeList({ workspaceId }) {
   const navigate = useNavigate();
+  const { isAuthenticated, authLoading } = useAuthStore();
+  const loadedForRef = useRef(null);
   const knowledge = useKnowledgeStore((s) => s.knowledge);
   const loading = useKnowledgeStore((s) => s.loading);
   const fetchKnowledge = useKnowledgeStore((s) => s.fetchKnowledge);
 
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!workspaceId || authLoading || !isAuthenticated) {
+      if (!isAuthenticated) loadedForRef.current = null;
+      return;
+    }
+    if (loadedForRef.current === workspaceId) return;
+    loadedForRef.current = workspaceId;
+
     fetchKnowledge({ workspaceId, limit: 50, sortBy: "lastEdited" }).catch(() => {});
-  }, [workspaceId, fetchKnowledge]);
+  }, [workspaceId, authLoading, isAuthenticated, fetchKnowledge]);
 
   const notes = knowledge
     .filter((n) => normalizeId(n.workspaceId) === normalizeId(workspaceId) && !n.archived)

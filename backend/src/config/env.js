@@ -76,5 +76,10 @@ module.exports = {
   uploads: {
     maxUploadMb: toInt('MAX_UPLOAD_MB', 10),
   },
+
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.0-flash',
+  },
 };
 

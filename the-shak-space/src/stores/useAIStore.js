@@ -1,213 +1,211 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import {
-  createDefaultConversation,
-  createDefaultMessage,
-  migrateConversation,
-  normalizeId,
-  deriveTitleFromMessage,
-  estimateTokens,
-} from "../utils/aiHelpers";
+import { aiService } from "../services/aiService";
+import { normalizeConversation, normalizeMessage } from "../utils/aiHelpers";
 
-const initialConversations = [
-  createDefaultConversation({
-    id: "conv-welcome",
-    title: "Shak Space Overview",
-    model: "gpt",
-    pinned: true,
-    favorite: true,
-    messages: [
-      createDefaultMessage({
-        id: "msg-w1",
-        role: "assistant",
-        content:
-          "Welcome to **The Shak Space AI Assistant**. I have indexed your workspaces, knowledge notes, and automation rules.\n\nAsk me anything — summarize docs, draft content, explain code, or plan workflows.",
-      }),
-    ],
-    tokenCount: 120,
-  }),
-];
-
-function mapConversation(state, id, updater) {
-  const targetId = normalizeId(id);
-  return {
-    conversations: state.conversations.map((c) =>
-      normalizeId(c.id) === targetId ? updater(c) : c
-    ),
-  };
+function extractConversations(res) {
+  const list = res?.data?.data?.items ?? res?.data?.items ?? [];
+  return Array.isArray(list) ? list : [];
 }
 
-export const useAIStore = create(
-  persist(
-    (set, get) => ({
-      conversations: initialConversations,
-      activeConversationId: "conv-welcome",
-      isGenerating: false,
+function extractConversation(res) {
+  return res?.data?.data?.conversation ?? res?.data?.conversation ?? null;
+}
 
-      createConversation: (overrides = {}) => {
-        const conv = createDefaultConversation(overrides);
-        set((state) => ({
-          conversations: [conv, ...state.conversations],
-          activeConversationId: conv.id,
-        }));
-        return conv.id;
-      },
+function extractMessages(res) {
+  const list = res?.data?.data?.messages ?? res?.data?.messages ?? [];
+  return Array.isArray(list) ? list : [];
+}
 
-      setActiveConversation: (id) => {
-        set((state) => ({
-          ...mapConversation(state, id, (c) => ({
-            ...c,
-            lastOpened: new Date().toISOString(),
-          })),
-          activeConversationId: normalizeId(id),
-        }));
-      },
+function extractChatResult(res) {
+  return res?.data?.data ?? res?.data ?? {};
+}
 
-      renameConversation: (id, title) =>
-        set((state) =>
-          mapConversation(state, id, (c) => ({
-            ...c,
-            title: title.trim() || c.title,
-            updatedAt: new Date().toISOString(),
-          }))
-        ),
+function extractApiError(err) {
+  const data = err?.response?.data;
+  return (
+    data?.error?.message ??
+    data?.message ??
+    (typeof data?.error === "string" ? data.error : null) ??
+    err?.message ??
+    "Request failed"
+  );
+}
 
-      deleteConversation: (id) =>
-        set((state) => {
-          const remaining = state.conversations.filter(
-            (c) => normalizeId(c.id) !== normalizeId(id)
-          );
-          const activeId =
-            normalizeId(state.activeConversationId) === normalizeId(id)
-              ? remaining[0]?.id ?? null
-              : state.activeConversationId;
-          return { conversations: remaining, activeConversationId: activeId };
-        }),
+export const useAIStore = create((set, get) => ({
+  conversations: [],
+  currentConversation: null,
+  messages: [],
+  loading: false,
+  streaming: false,
+  error: null,
+  provider: "gemini",
+  model: "gemini-2.0-flash",
+  _conversationsRequestId: 0,
+  _messagesRequestId: 0,
 
-      togglePinConversation: (id) =>
-        set((state) =>
-          mapConversation(state, id, (c) => ({
-            ...c,
-            pinned: !c.pinned,
-            updatedAt: new Date().toISOString(),
-          }))
-        ),
+  setProvider: (provider) => set({ provider }),
+  setModel: (model) => set({ model }),
 
-      toggleFavoriteConversation: (id) =>
-        set((state) =>
-          mapConversation(state, id, (c) => ({
-            ...c,
-            favorite: !c.favorite,
-            updatedAt: new Date().toISOString(),
-          }))
-        ),
-
-      archiveConversation: (id) =>
-        set((state) =>
-          mapConversation(state, id, (c) => ({
-            ...c,
-            archived: true,
-            pinned: false,
-            updatedAt: new Date().toISOString(),
-          }))
-        ),
-
-      restoreConversation: (id) =>
-        set((state) =>
-          mapConversation(state, id, (c) => ({
-            ...c,
-            archived: false,
-            updatedAt: new Date().toISOString(),
-          }))
-        ),
-
-      setConversationModel: (id, model) =>
-        set((state) =>
-          mapConversation(state, id, (c) => ({ ...c, model, updatedAt: new Date().toISOString() }))
-        ),
-
-      addMessage: (conversationId, message) =>
-        set((state) =>
-          mapConversation(state, conversationId, (c) => {
-            const msg = createDefaultMessage(message);
-            const tokens = estimateTokens(msg.content);
-            return {
-              ...c,
-              messages: [...c.messages, msg],
-              tokenCount: (c.tokenCount ?? 0) + tokens,
-              updatedAt: new Date().toISOString(),
-              title:
-                c.messages.length === 0 && msg.role === "user"
-                  ? deriveTitleFromMessage(msg.content)
-                  : c.title,
-            };
-          })
-        ),
-
-      updateMessage: (conversationId, messageId, data) =>
-        set((state) =>
-          mapConversation(state, conversationId, (c) => ({
-            ...c,
-            messages: c.messages.map((m) =>
-              normalizeId(m.id) === normalizeId(messageId) ? { ...m, ...data } : m
-            ),
-            updatedAt: new Date().toISOString(),
-          }))
-        ),
-
-      deleteMessage: (conversationId, messageId) =>
-        set((state) =>
-          mapConversation(state, conversationId, (c) => ({
-            ...c,
-            messages: c.messages.filter(
-              (m) => normalizeId(m.id) !== normalizeId(messageId)
-            ),
-            updatedAt: new Date().toISOString(),
-          }))
-        ),
-
-      appendToMessage: (conversationId, messageId, chunk) =>
-        set((state) =>
-          mapConversation(state, conversationId, (c) => ({
-            ...c,
-            messages: c.messages.map((m) =>
-              normalizeId(m.id) === normalizeId(messageId)
-                ? { ...m, content: (m.content ?? "") + chunk }
-                : m
-            ),
-          }))
-        ),
-
-      setIsGenerating: (isGenerating) => set({ isGenerating }),
-
-      getActiveConversation: () => {
-        const { conversations, activeConversationId } = get();
-        return conversations.find(
-          (c) => normalizeId(c.id) === normalizeId(activeConversationId)
-        );
-      },
-
-      getConversationById: (id) =>
-        get().conversations.find((c) => normalizeId(c.id) === normalizeId(id)),
-    }),
-    {
-      name: "shak-space-ai",
-      version: 1,
-      migrate: (persistedState) => {
-        const state = persistedState ?? {};
-        const raw = Array.isArray(state.conversations) ? state.conversations : [];
-        return {
-          ...state,
-          conversations:
-            raw.length > 0 ? raw.map(migrateConversation) : initialConversations,
-          activeConversationId: state.activeConversationId ?? "conv-welcome",
-          isGenerating: false,
-        };
-      },
-      partialize: (state) => ({
-        conversations: state.conversations,
-        activeConversationId: state.activeConversationId,
-      }),
+  fetchConversations: async () => {
+    const requestId = get()._conversationsRequestId + 1;
+    set({ loading: true, error: null, _conversationsRequestId: requestId });
+    try {
+      const res = await aiService.getConversations();
+      if (get()._conversationsRequestId !== requestId) return get().conversations;
+      const conversations = extractConversations(res).map(normalizeConversation);
+      set({ conversations, error: null });
+      return conversations;
+    } catch (e) {
+      if (get()._conversationsRequestId === requestId) {
+        set({ error: extractApiError(e) });
+      }
+      throw e;
+    } finally {
+      if (get()._conversationsRequestId === requestId) {
+        set({ loading: false });
+      }
     }
-  )
-);
+  },
+
+  createConversation: async (payload = {}) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await aiService.createConversation({
+        title: payload.title || "New conversation",
+        provider: payload.provider || get().provider,
+        model: payload.model || get().model,
+      });
+      const conversation = normalizeConversation(extractConversation(res));
+      if (!conversation) throw new Error("Failed to create conversation");
+      set((state) => ({
+        conversations: [conversation, ...state.conversations],
+        currentConversation: conversation,
+        messages: [],
+        error: null,
+      }));
+      return conversation;
+    } catch (e) {
+      set({ error: extractApiError(e) });
+      throw e;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  renameConversation: async (id, title) => {
+    const trimmed = String(title ?? "").trim();
+    if (!trimmed) return null;
+    set({ error: null });
+    try {
+      const res = await aiService.updateConversation(id, { title: trimmed });
+      const conversation = normalizeConversation(extractConversation(res));
+      set((state) => ({
+        conversations: state.conversations.map((c) => (c.id === id ? conversation : c)),
+        currentConversation:
+          state.currentConversation?.id === id ? conversation : state.currentConversation,
+        error: null,
+      }));
+      return conversation;
+    } catch (e) {
+      set({ error: extractApiError(e) });
+      throw e;
+    }
+  },
+
+  deleteConversation: async (id) => {
+    set({ error: null });
+    try {
+      await aiService.deleteConversation(id);
+      set((state) => {
+        const conversations = state.conversations.filter((c) => c.id !== id);
+        const isCurrent = state.currentConversation?.id === id;
+        return {
+          conversations,
+          currentConversation: isCurrent ? null : state.currentConversation,
+          messages: isCurrent ? [] : state.messages,
+          error: null,
+        };
+      });
+      return true;
+    } catch (e) {
+      set({ error: extractApiError(e) });
+      throw e;
+    }
+  },
+
+  fetchMessages: async (conversationId) => {
+    if (!conversationId) return [];
+    const requestId = get()._messagesRequestId + 1;
+    set({ loading: true, error: null, _messagesRequestId: requestId });
+    try {
+      const res = await aiService.getMessages(conversationId);
+      if (get()._messagesRequestId !== requestId) return get().messages;
+      const messages = extractMessages(res).map(normalizeMessage);
+      set({ messages, error: null });
+      return messages;
+    } catch (e) {
+      if (get()._messagesRequestId === requestId) {
+        set({ error: extractApiError(e) });
+      }
+      throw e;
+    } finally {
+      if (get()._messagesRequestId === requestId) {
+        set({ loading: false });
+      }
+    }
+  },
+
+  sendMessage: async (message, { conversationId } = {}) => {
+    const content = String(message ?? "").trim();
+    if (!content) return null;
+
+    set({ streaming: true, error: null });
+    try {
+      const res = await aiService.chat({
+        conversationId: conversationId || get().currentConversation?.id,
+        message: content,
+        provider: get().provider,
+        model: get().model,
+      });
+
+      const result = extractChatResult(res);
+      const conversation = normalizeConversation(result.conversation);
+      const userMessage = normalizeMessage(result.userMessage);
+      const assistantMessage = normalizeMessage(result.assistantMessage);
+
+      set((state) => {
+        const exists = state.conversations.some((c) => c.id === conversation?.id);
+        const conversations = exists
+          ? state.conversations.map((c) => (c.id === conversation?.id ? conversation : c))
+          : conversation
+            ? [conversation, ...state.conversations]
+            : state.conversations;
+
+        return {
+          conversations,
+          currentConversation: conversation || state.currentConversation,
+          messages: [...state.messages, userMessage, assistantMessage].filter(Boolean),
+          streaming: false,
+          error: null,
+        };
+      });
+
+      return { conversation, userMessage, assistantMessage };
+    } catch (e) {
+      set({ streaming: false, error: extractApiError(e) });
+      throw e;
+    }
+  },
+
+  setCurrentConversation: (conversation) => {
+    set({
+      currentConversation: conversation ? normalizeConversation(conversation) : null,
+      messages: [],
+      error: null,
+    });
+  },
+
+  clearConversation: () => {
+    set({ currentConversation: null, messages: [], error: null });
+  },
+}));

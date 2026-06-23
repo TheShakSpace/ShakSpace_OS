@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -16,6 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useKnowledgeStore } from "../stores/useKnowledgeStore";
+import { useAuthStore } from "../stores/useAuthStore";
 import { formatDate } from "../utils/knowledgeHelpers";
 
 const LOG_ICON_BY_ACTION = {
@@ -26,14 +27,24 @@ const LOG_ICON_BY_ACTION = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { isAuthenticated, authLoading } = useAuthStore();
+  const initialLoadRef = useRef(false);
   const knowledgeNotes = useKnowledgeStore((s) => s.knowledge);
   const fetchKnowledge = useKnowledgeStore((s) => s.fetchKnowledge);
+  const fetchStats = useKnowledgeStore((s) => s.fetchStats);
   const knowledgeStats = useKnowledgeStore((s) => s.stats);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated) {
+      initialLoadRef.current = false;
+      return;
+    }
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+
     fetchKnowledge({ limit: 10, sortBy: "lastEdited" }).catch(() => {});
-    useKnowledgeStore.getState().fetchStats().catch(() => {});
-  }, [fetchKnowledge]);
+    fetchStats().catch(() => {});
+  }, [authLoading, isAuthenticated, fetchKnowledge, fetchStats]);
 
   const recentNotes = [...knowledgeNotes]
     .filter((n) => !n.archived)

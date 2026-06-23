@@ -42,7 +42,7 @@ const VIEW_TITLES = {
 export default function KnowledgeHubPage() {
   const navigate = useNavigate();
   const showToast = useToastStore((s) => s.showToast);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { isAuthenticated, authLoading } = useAuthStore();
   const initialLoadRef = useRef(false);
 
   const knowledge = useKnowledgeStore((s) => s.knowledge);
@@ -51,6 +51,9 @@ export default function KnowledgeHubPage() {
   const serverStats = useKnowledgeStore((s) => s.stats);
   const storeTags = useKnowledgeStore((s) => s.tags);
 
+  const fetchKnowledge = useKnowledgeStore((s) => s.fetchKnowledge);
+  const fetchStats = useKnowledgeStore((s) => s.fetchStats);
+  const fetchTags = useKnowledgeStore((s) => s.fetchTags);
   const createKnowledge = useKnowledgeStore((s) => s.createKnowledge);
   const updateKnowledge = useKnowledgeStore((s) => s.updateKnowledge);
   const deleteKnowledge = useKnowledgeStore((s) => s.deleteKnowledge);
@@ -81,14 +84,22 @@ export default function KnowledgeHubPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated || initialLoadRef.current) return;
+    if (authLoading || !isAuthenticated) {
+      initialLoadRef.current = false;
+      return;
+    }
+    if (initialLoadRef.current) return;
     initialLoadRef.current = true;
+
     let active = true;
     const load = async () => {
       try {
         await fetchWorkspaces().catch(() => {});
-        await useKnowledgeStore.getState().refresh();
-        await useKnowledgeStore.getState().fetchTags();
+        await Promise.all([
+          fetchKnowledge().catch(() => {}),
+          fetchStats().catch(() => {}),
+          fetchTags().catch(() => {}),
+        ]);
       } catch (e) {
         if (active) showToast(extractApiError(e), "error");
       }
@@ -97,7 +108,7 @@ export default function KnowledgeHubPage() {
     return () => {
       active = false;
     };
-  }, [isAuthenticated, fetchWorkspaces, showToast]);
+  }, [authLoading, isAuthenticated, fetchKnowledge, fetchStats, fetchTags, fetchWorkspaces, showToast]);
 
   useEffect(() => {
     setFilters({

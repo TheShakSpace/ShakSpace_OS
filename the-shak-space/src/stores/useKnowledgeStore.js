@@ -27,12 +27,19 @@ function extractTags(res) {
   return res?.data?.data?.tags ?? res?.data?.tags ?? [];
 }
 
+function isUnauthorized(e) {
+  return e?.response?.status === 401;
+}
+
 function replaceInList(items, target, item) {
   return items.map((n) => (normalizeId(n.id) === target && item ? item : n));
 }
 
 async function refreshAll(get) {
-  await Promise.all([get().fetchKnowledge(), get().fetchStats()]);
+  await Promise.all([
+    get().fetchKnowledge().catch(() => {}),
+    get().fetchStats().catch(() => {}),
+  ]);
 }
 
 export const useKnowledgeStore = create((set, get) => ({
@@ -56,6 +63,8 @@ export const useKnowledgeStore = create((set, get) => ({
     archived: undefined,
   },
   _listRequestId: 0,
+  _statsRequestId: 0,
+  _tagsRequestId: 0,
 
   setSearch: (search) => set({ search }),
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
@@ -100,13 +109,18 @@ export const useKnowledgeStore = create((set, get) => ({
 
       const knowledge = extractList(res).map(normalizeKnowledgeItem);
       const pagination = extractPagination(res);
-      set({ knowledge, pagination, loading: false, error: null });
+      set({ knowledge, pagination, error: null });
       return knowledge;
     } catch (e) {
       if (get()._listRequestId === requestId) {
-        set({ loading: false, error: e?.response?.data ?? e?.message ?? String(e) });
+        set({ error: e?.response?.data ?? e?.message ?? String(e) });
       }
+      if (isUnauthorized(e)) return get().knowledge;
       throw e;
+    } finally {
+      if (get()._listRequestId === requestId) {
+        set({ loading: false });
+      }
     }
   },
 
@@ -127,15 +141,17 @@ export const useKnowledgeStore = create((set, get) => ({
               : state.knowledge,
           currentKnowledge: item,
           selectedKnowledge: item,
-          loading: false,
           error: null,
         };
       });
 
       return item;
     } catch (e) {
-      set({ loading: false, error: e?.response?.data ?? e?.message ?? String(e) });
+      set({ error: e?.response?.data ?? e?.message ?? String(e) });
+      if (isUnauthorized(e)) return null;
       throw e;
+    } finally {
+      set({ loading: false });
     }
   },
 
@@ -320,28 +336,40 @@ export const useKnowledgeStore = create((set, get) => ({
   },
 
   fetchStats: async (workspaceId) => {
-    set({ statsLoading: true, statsError: null });
+    const requestId = get()._statsRequestId + 1;
+    set({ statsLoading: true, statsError: null, _statsRequestId: requestId });
     try {
       const res = await knowledgeService.getKnowledgeStats(workspaceId);
+      if (get()._statsRequestId !== requestId) return get().stats;
+
       const data = extractStats(res);
-      set({ stats: data, statsLoading: false, statsError: null });
+      set({ stats: data, statsError: null });
       return data;
     } catch (e) {
-      set({
-        statsLoading: false,
-        statsError: e?.response?.data ?? e?.message ?? String(e),
-      });
+      if (get()._statsRequestId === requestId) {
+        set({ statsError: e?.response?.data ?? e?.message ?? String(e) });
+      }
+      if (isUnauthorized(e)) return get().stats;
       throw e;
+    } finally {
+      if (get()._statsRequestId === requestId) {
+        set({ statsLoading: false });
+      }
     }
   },
 
   fetchTags: async (workspaceId) => {
+    const requestId = get()._tagsRequestId + 1;
+    set({ _tagsRequestId: requestId });
     try {
       const res = await knowledgeService.getKnowledgeTags(workspaceId);
+      if (get()._tagsRequestId !== requestId) return get().tags;
+
       const tags = extractTags(res);
       set({ tags: Array.isArray(tags) ? tags : [] });
       return tags;
-    } catch {
+    } catch (e) {
+      if (isUnauthorized(e)) return get().tags;
       return [];
     }
   },

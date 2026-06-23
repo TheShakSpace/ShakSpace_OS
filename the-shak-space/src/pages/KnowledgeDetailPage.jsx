@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { useKnowledgeStore } from "../stores/useKnowledgeStore";
+import { useAuthStore } from "../stores/useAuthStore";
 import { useToastStore } from "../stores/useToastStore";
 import {
   computeWordCount,
@@ -37,6 +38,7 @@ export default function KnowledgeDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const showToast = useToastStore((s) => s.showToast);
+  const { isAuthenticated, authLoading } = useAuthStore();
 
   const loading = useKnowledgeStore((s) => s.loading);
   const fetchKnowledgeById = useKnowledgeStore((s) => s.fetchKnowledgeById);
@@ -59,7 +61,12 @@ export default function KnowledgeDetailPage() {
   const openedRef = useRef(false);
 
   useEffect(() => {
-    if (!id) return;
+    openedRef.current = false;
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || authLoading || !isAuthenticated) return;
+
     const cached = getKnowledgeById(id);
     if (cached) {
       setTitle(cached.title ?? "");
@@ -84,7 +91,7 @@ export default function KnowledgeDetailPage() {
         }
       })
       .catch((e) => showToast(extractApiError(e), "error"));
-  }, [id, getKnowledgeById, fetchKnowledgeById, openKnowledge, showToast]);
+  }, [id, authLoading, isAuthenticated, getKnowledgeById, fetchKnowledgeById, openKnowledge, showToast]);
 
   const wordCount = useMemo(() => computeWordCount(content), [content]);
   const readingTime = useMemo(() => estimateReadTime(content), [content]);
