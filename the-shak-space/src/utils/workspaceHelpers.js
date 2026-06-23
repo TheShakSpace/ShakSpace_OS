@@ -1,16 +1,47 @@
-export const WORKSPACE_CATEGORIES = [
-  "All",
-  "Development",
-  "Research",
-  "Startup",
-  "AI Project",
-  "College",
-  "Freelancing",
-  "Personal",
-  "Open Source",
-  "Client",
-  "Learning",
+export const BACKEND_CATEGORIES = [
+  "general",
+  "personal",
+  "team",
+  "education",
+  "business",
+  "research",
 ];
+
+export const WORKSPACE_CATEGORIES = [
+  { value: "all", label: "All" },
+  { value: "general", label: "General" },
+  { value: "personal", label: "Personal" },
+  { value: "team", label: "Team" },
+  { value: "education", label: "Education" },
+  { value: "business", label: "Business" },
+  { value: "research", label: "Research" },
+];
+
+const CATEGORY_ALIASES = {
+  development: "general",
+  dev: "general",
+  startup: "business",
+  "ai project": "research",
+  "ai-project": "research",
+  aiproject: "research",
+  college: "education",
+  freelancing: "business",
+  freelance: "business",
+  "open source": "team",
+  "open-source": "team",
+  opensource: "team",
+  client: "business",
+  learning: "education",
+};
+
+const CATEGORY_LABELS = {
+  general: "General",
+  personal: "Personal",
+  team: "Team",
+  education: "Education",
+  business: "Business",
+  research: "Research",
+};
 
 export const SORT_OPTIONS = [
   { id: "newest", label: "Newest" },
@@ -26,6 +57,64 @@ export const FILTER_OPTIONS = [
 
 export function normalizeId(id) {
   return id == null ? "" : String(id);
+}
+
+export function looksLikeHex(value) {
+  if (typeof value !== "string") return false;
+  return /^#([0-9a-fA-F]{3}){1,2}$/.test(value.trim());
+}
+
+export function looksLikeGradient(value) {
+  if (typeof value !== "string") return false;
+  return /\bfrom-|\bto-/i.test(value);
+}
+
+export function normalizeCategoryForApi(value) {
+  if (!value || typeof value !== "string") return "general";
+  const lower = value.trim().toLowerCase();
+  if (BACKEND_CATEGORIES.includes(lower)) return lower;
+  return CATEGORY_ALIASES[lower] ?? "general";
+}
+
+export function formatCategoryLabel(value) {
+  if (!value) return "General";
+  const lower = String(value).trim().toLowerCase();
+  return CATEGORY_LABELS[lower] ?? value;
+}
+
+export function normalizeApiPayload(payload) {
+  const safe = payload ?? {};
+
+  const backendColor = (() => {
+    const accent = safe.accentColor;
+    const raw = safe.color;
+    if (accent && looksLikeHex(accent) && !looksLikeGradient(accent)) return accent;
+    if (raw && looksLikeHex(raw) && !looksLikeGradient(raw)) return raw;
+    return "#4F8CFF";
+  })();
+
+  return {
+    name: safe.name,
+    description: safe.description ?? "",
+    category: normalizeCategoryForApi(safe.category),
+    color: backendColor,
+    icon: safe.icon ?? "📁",
+  };
+}
+
+export function extractApiError(error) {
+  const data = error?.response?.data;
+  if (!data) return error?.message ?? "Something went wrong";
+
+  if (typeof data === "string") return data;
+
+  if (data?.error?.message) return data.error.message;
+  if (data?.error?.details?.length) {
+    return data.error.details.map((d) => d.message).join(", ");
+  }
+  if (data?.message) return data.message;
+
+  return "Something went wrong";
 }
 
 export function formatDate(iso) {
@@ -65,84 +154,6 @@ export function formatStorage(mb) {
   return `${value.toFixed(1)} MB`;
 }
 
-export function generateWorkspaceId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-export function createDefaultWorkspace(overrides = {}) {
-  const now = new Date().toISOString();
-  return {
-    id: generateWorkspaceId(),
-    name: "Untitled Workspace",
-    description: "",
-    category: "Development",
-    icon: "📁",
-    color: "from-blue-500/20 to-indigo-500/10",
-    accentColor: "#4F8CFF",
-    tags: [],
-    pinned: false,
-    favorite: false,
-    archived: false,
-    lastOpened: null,
-    storage: 0,
-    documents: 0,
-    knowledge: 0,
-    aiChats: 0,
-    automations: 0,
-    status: "active",
-    createdAt: now,
-    updatedAt: now,
-    activity: [
-      {
-        id: generateWorkspaceId(),
-        type: "created",
-        label: "Workspace created",
-        timestamp: now,
-      },
-    ],
-    ...overrides,
-  };
-}
-
-export function migrateWorkspace(raw) {
-  const w = raw ?? {};
-  const now = new Date().toISOString();
-  const id = normalizeId(w.id || generateWorkspaceId());
-
-  const documents = w.documents ?? w.items ?? 0;
-  const updatedAt = w.updatedAt ?? w.updated ?? w.createdAt ?? now;
-
-  return createDefaultWorkspace({
-    ...w,
-    id,
-    documents,
-    knowledge: w.knowledge ?? 0,
-    aiChats: w.aiChats ?? 0,
-    automations: w.automations ?? 0,
-    storage: w.storage ?? 0,
-    favorite: Boolean(w.favorite),
-    pinned: Boolean(w.pinned),
-    archived: Boolean(w.archived),
-    lastOpened: w.lastOpened ?? null,
-    icon: w.icon ?? "📁",
-    color: w.color ?? "from-blue-500/20 to-indigo-500/10",
-    accentColor: w.accentColor ?? "#4F8CFF",
-    tags: Array.isArray(w.tags) ? w.tags : [],
-    status: w.status ?? "active",
-    updatedAt,
-    activity: Array.isArray(w.activity) && w.activity.length > 0
-      ? w.activity
-      : [
-          {
-            id: generateWorkspaceId(),
-            type: "created",
-            label: "Workspace created",
-            timestamp: w.createdAt ?? now,
-          },
-        ],
-  });
-}
-
 export function searchWorkspaces(workspaces, query) {
   const q = query.trim().toLowerCase();
   if (!q) return workspaces;
@@ -174,9 +185,9 @@ export function filterWorkspaces(workspaces, { category, statusFilter, sortBy })
     result = result.filter((w) => !w.archived);
   }
 
-  const cat = (category ?? "All").toLowerCase();
+  const cat = (category ?? "all").toLowerCase();
   if (cat !== "all") {
-    result = result.filter((w) => (w.category ?? "").toLowerCase() === cat);
+    result = result.filter((w) => normalizeCategoryForApi(w.category) === cat);
   }
 
   if (sortBy === "oldest") {
@@ -207,5 +218,20 @@ export function getWorkspaceStats(workspaces) {
     aiChats: active.reduce((sum, w) => sum + (w.aiChats ?? 0), 0),
     automations: active.reduce((sum, w) => sum + (w.automations ?? 0), 0),
     storage: active.reduce((sum, w) => sum + (w.storage ?? 0), 0),
+  };
+}
+
+export function mergeServerStats(clientStats, serverStats) {
+  if (!serverStats) return clientStats;
+
+  const archived = serverStats.archived ?? clientStats.archived;
+  const totalAll = serverStats.total ?? clientStats.total + archived;
+
+  return {
+    ...clientStats,
+    total: Math.max(0, totalAll - archived),
+    pinned: serverStats.pinned ?? clientStats.pinned,
+    archived,
+    favorites: serverStats.favorites ?? clientStats.favorites,
   };
 }

@@ -1,22 +1,27 @@
 const { body, param, query } = require('express-validator');
+const {
+  normalizeKnowledgeQueryCategory,
+  normalizeKnowledgeCategory,
+  normalizeTags,
+} = require('../utils/knowledgeNormalize');
 
-function optionalEnum(allowed) {
-  return query('value').optional().isIn(allowed);
-}
+const knowledgeId = param('id')
+  .isString()
+  .bail()
+  .notEmpty()
+  .bail()
+  .isMongoId()
+  .withMessage('id must be a valid ObjectId');
 
-const objectIdParam = param('id').isMongoId().withMessage('Invalid id');
-
-// Common query parsing
-const pagination = [
+const paginationQuery = [
   query('page').optional().isInt({ min: 1 }).toInt().withMessage('page must be >= 1'),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('limit must be between 1 and 100'),
 ];
 
-const sort = [
+const sortQuery = [
   query('sortBy')
     .optional()
-    .isString()
-    .isIn(['newest', 'oldest', 'lastEdited', 'title'])
+    .isIn(['newest', 'oldest', 'lastEdited', 'title', 'recent'])
     .withMessage('Invalid sortBy'),
   query('sortOrder').optional().isIn(['asc', 'desc']).withMessage('Invalid sortOrder'),
 ];
@@ -27,154 +32,174 @@ const boolFilters = [
   query('archived').optional().isBoolean().withMessage('archived must be boolean').toBoolean(),
 ];
 
-const workspaceFilter = [query('workspaceId').optional().isMongoId().withMessage('Invalid workspaceId')];
+const workspaceFilter = [
+  query('workspaceId').optional().isMongoId().withMessage('Invalid workspaceId'),
+];
 
-const collectionFilter = [
-  query('collection')
+const categoryFilter = [
+  query('category')
     .optional()
-    .isString()
-    .isLength({ min: 1, max: 80 })
-    .withMessage('collection must be 1-80 chars'),
+    .customSanitizer(normalizeKnowledgeQueryCategory)
+    .isIn(['general', 'personal', 'team', 'education', 'business', 'research']),
 ];
 
 const tagsFilter = [
   query('tags')
     .optional()
-    .custom((v) => {
-      // Accept either comma-separated string or array of strings
-      if (typeof v === 'string') return v.split(',').map((x) => x.trim()).filter(Boolean).length >= 0;
-      if (Array.isArray(v)) return true;
-      return false;
-    })
+    .custom((v) => typeof v === 'string' || Array.isArray(v))
     .withMessage('tags must be a comma-separated string or array'),
 ];
 
-const textSearch = [
-  query('title').optional().isString().isLength({ min: 1, max: 200 }).withMessage('title search must be 1-200 chars'),
-  query('content')
-    .optional()
-    .isString()
-    .isLength({ min: 1, max: 200 }).withMessage('content search must be 1-200 chars'),
-  query('summary')
-    .optional()
-    .isString()
-    .isLength({ min: 1, max: 200 }).withMessage('summary search must be 1-200 chars'),
-  query('collection')
-    .optional()
-    .isString()
-    .isLength({ min: 1, max: 80 })
-    .withMessage('collection must be 1-80 chars'),
-  query('tags')
-    .optional()
-    .custom((v) => {
-      if (typeof v === 'string') return true;
-      if (Array.isArray(v)) return v.every((t) => typeof t === 'string' && t.length <= 40);
-      return false;
-    })
-    .withMessage('Invalid tags'),
+const searchQuery = [
+  query('search').optional().isString().isLength({ min: 1, max: 500 }).withMessage('search must be 1-500 chars'),
+  query('q').optional().isString().isLength({ min: 1, max: 500 }).withMessage('q must be 1-500 chars'),
 ];
 
-// Unified endpoint spec uses: /api/knowledge + filters/search via query params
-const listQuery = [
-  ...pagination,
-  ...sort,
-  ...boolFilters,
-  ...workspaceFilter,
-  ...collectionFilter,
-  ...tagsFilter,
-  query('search')
-    .optional()
-    .isString()
-    .isLength({ min: 1, max: 500 })
-    .withMessage('search must be 1-500 chars'),
-  query('title').optional().isString().isLength({ min: 1, max: 200 }),
-  query('content').optional().isString().isLength({ min: 1, max: 200 }),
-  query('summary').optional().isString().isLength({ min: 1, max: 200 }),
-  query('tags').optional(),
-  query('collection').optional(),
-];
+const title = body('title')
+  .isString()
+  .bail()
+  .trim()
+  .notEmpty()
+  .withMessage('title is required')
+  .bail()
+  .isLength({ min: 1, max: 200 })
+  .withMessage('title must be between 1 and 200 characters');
 
-const createPayload = [
-  body('workspaceId').optional().isMongoId().withMessage('workspaceId must be valid mongo id'),
-  body('title').isString().isLength({ min: 1, max: 200 }).withMessage('title must be 1-200 chars'),
-  body('content').optional().isString().withMessage('content must be a string'),
-  body('summary').optional().isString().isLength({ max: 800 }).withMessage('summary must be <= 800 chars'),
-  body('collection')
-    .optional()
-    .isString()
-    .isLength({ max: 80 })
-    .withMessage('collection must be <= 80 chars'),
-  body('tags')
-    .optional()
-    .isArray()
-    .withMessage('tags must be an array')
-    .custom((arr) => arr.every((t) => typeof t === 'string' && t.length <= 40))
-    .withMessage('each tag must be a string with max length 40'),
-  body('favorite').optional().isBoolean().toBoolean(),
-  body('pinned').optional().isBoolean().toBoolean(),
-  body('archived').optional().isBoolean().toBoolean(),
-];
+const content = body('content').optional().isString().withMessage('content must be a string');
 
-const updatePayload = [
-  body('title').optional().isString().isLength({ min: 1, max: 200 }).withMessage('title must be 1-200 chars'),
-  body('content').optional().isString().withMessage('content must be a string'),
-  body('summary').optional().isString().isLength({ max: 800 }).withMessage('summary must be <= 800 chars'),
-  body('collection').optional().isString().isLength({ max: 80 }).withMessage('collection must be <= 80 chars'),
-  body('tags')
-    .optional()
-    .isArray()
-    .withMessage('tags must be an array')
-    .custom((arr) => arr.every((t) => typeof t === 'string' && t.length <= 40))
-    .withMessage('each tag must be a string with max length 40'),
-  body('favorite').optional().isBoolean().toBoolean(),
-  body('pinned').optional().isBoolean().toBoolean(),
-  body('archived').optional().isBoolean().toBoolean(),
-];
+const summary = body('summary')
+  .optional()
+  .isString()
+  .bail()
+  .trim()
+  .isLength({ max: 800 })
+  .withMessage('summary must be at most 800 characters');
 
-const pinPayload = [
-  body('value')
-    .exists()
-    .withMessage('value is required')
-    .isBoolean()
-    .toBoolean()
-    .withMessage('value must be boolean'),
-];
+const workspaceIdBody = body('workspaceId')
+  .exists()
+  .withMessage('workspaceId is required')
+  .bail()
+  .isMongoId()
+  .withMessage('workspaceId must be a valid ObjectId');
 
-const noOwnershipFieldUpdate = [
-  body('workspaceId')
-    .optional()
-    .custom((v, { req }) => {
-      // Disallow setting workspaceId via update endpoints
-      if (req.route?.path?.includes('/knowledge/collections')) return true;
-      return false;
-    }),
-];
+const workspaceIdOptional = body('workspaceId').optional().isMongoId().withMessage('workspaceId must be valid');
 
-// Collection CRUD
-const collectionCreate = [
-  body('name').isString().isLength({ min: 1, max: 80 }).withMessage('name must be 1-80 chars'),
-];
+const categoryBody = body('category')
+  .optional()
+  .isString()
+  .bail()
+  .customSanitizer(normalizeKnowledgeCategory)
+  .isIn(['general', 'personal', 'team', 'education', 'business', 'research'])
+  .withMessage('Invalid category');
 
-const collectionUpdate = [
-  body('name').optional().isString().isLength({ min: 1, max: 80 }).withMessage('name must be 1-80 chars'),
-];
+const colorBody = body('color')
+  .optional()
+  .isString()
+  .bail()
+  .matches(/^#([0-9a-fA-F]{3}){1,2}$/)
+  .withMessage('color must be a valid hex color');
+
+const iconBody = body('icon')
+  .optional()
+  .isString()
+  .bail()
+  .trim()
+  .isLength({ max: 64 })
+  .withMessage('icon must be at most 64 characters');
+
+const tagsBody = body('tags')
+  .optional()
+  .customSanitizer(normalizeTags)
+  .isArray()
+  .withMessage('tags must be an array')
+  .custom((arr) => arr.every((t) => typeof t === 'string' && t.length <= 40))
+  .withMessage('each tag must be a string with max length 40');
+
+const flagBody = body('value')
+  .exists()
+  .withMessage('value is required')
+  .isBoolean()
+  .withMessage('value must be boolean')
+  .toBoolean();
+
+function knowledgeList() {
+  return [
+    ...paginationQuery,
+    ...sortQuery,
+    ...boolFilters,
+    ...workspaceFilter,
+    ...categoryFilter,
+    ...tagsFilter,
+    ...searchQuery,
+  ];
+}
+
+function knowledgeCreate() {
+  return [workspaceIdBody, title, content, summary, categoryBody, colorBody, iconBody, tagsBody];
+}
+
+const titleOptional = body('title')
+  .optional()
+  .isString()
+  .bail()
+  .trim()
+  .notEmpty()
+  .withMessage('title cannot be empty')
+  .bail()
+  .isLength({ min: 1, max: 200 })
+  .withMessage('title must be between 1 and 200 characters');
+
+function knowledgeUpdate() {
+  return [titleOptional, content, summary, categoryBody, colorBody, iconBody, tagsBody, workspaceIdOptional];
+}
+
+function knowledgePin() {
+  return [knowledgeId, flagBody];
+}
+
+function knowledgeFavorite() {
+  return [knowledgeId, flagBody];
+}
+
+function knowledgeArchive() {
+  return [knowledgeId, flagBody];
+}
+
+function knowledgeRestore() {
+  return [knowledgeId];
+}
+
+function knowledgeOpen() {
+  return [knowledgeId];
+}
+
+function knowledgeDelete() {
+  return [knowledgeId];
+}
+
+function knowledgeGet() {
+  return [knowledgeId];
+}
+
+function knowledgeStats() {
+  return [...workspaceFilter];
+}
+
+function knowledgeTags() {
+  return [...workspaceFilter];
+}
 
 module.exports = {
-  listQuery,
-  objectIdParam,
-  createPayload,
-  updatePayload,
-  pinPayload,
-  textSearch,
-  pagination,
-  sort,
-  boolFilters,
-  workspaceFilter,
-  collectionFilter,
-  tagsFilter,
-  createPayload,
-  updatePayload,
-  collectionCreate,
-  collectionUpdate,
+  knowledgeList,
+  knowledgeGet,
+  knowledgeCreate,
+  knowledgeUpdate,
+  knowledgeDelete,
+  knowledgePin,
+  knowledgeFavorite,
+  knowledgeArchive,
+  knowledgeRestore,
+  knowledgeOpen,
+  knowledgeStats,
+  knowledgeTags,
 };
-

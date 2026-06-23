@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { motion } from "motion/react";
 import { Plus } from "lucide-react";
 
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
+import { useAuthStore } from "../stores/useAuthStore";
+import { useToastStore } from "../stores/useToastStore";
 import {
   searchWorkspaces,
   filterWorkspaces,
   getRecentWorkspaces,
   getWorkspaceStats,
+  mergeServerStats,
   normalizeId,
+  extractApiError,
 } from "../utils/workspaceHelpers";
 
 import WorkspaceHero from "../components/workspace/WorkspaceHero";
@@ -25,9 +29,14 @@ import ArchivedSection from "../components/workspace/ArchivedSection";
 
 export default function WorkspacesPage() {
   const navigate = useNavigate();
+  const showToast = useToastStore((state) => state.showToast);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const initialLoadRef = useRef(false);
 
   const workspaces = useWorkspaceStore((state) => state.workspaces);
-  const fetchWorkspaces = useWorkspaceStore((state) => state.fetchWorkspaces);
+  const loading = useWorkspaceStore((state) => state.loading);
+  const error = useWorkspaceStore((state) => state.error);
+  const serverStats = useWorkspaceStore((state) => state.stats);
 
   const addWorkspace = useWorkspaceStore((state) => state.addWorkspace);
   const deleteWorkspace = useWorkspaceStore((state) => state.deleteWorkspace);
@@ -44,19 +53,36 @@ export default function WorkspacesPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingWorkspaceId, setEditingWorkspaceId] = useState(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
 
   useEffect(() => {
-    fetchWorkspaces().catch(() => {});
-  }, [fetchWorkspaces]);
+    if (!isAuthenticated || initialLoadRef.current) return;
+    initialLoadRef.current = true;
 
-  const stats = useMemo(() => getWorkspaceStats(workspaces), [workspaces]);
+    let active = true;
+    const load = async () => {
+      try {
+        await useWorkspaceStore.getState().refresh();
+      } catch (e) {
+        if (active) showToast(extractApiError(e), "error");
+      }
+    };
 
+    load();
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, showToast]);
 
+  const stats = useMemo(() => {
+    const clientStats = getWorkspaceStats(workspaces);
+    return mergeServerStats(clientStats, serverStats);
+  }, [workspaces, serverStats]);
 
   const filteredWorkspaces = useMemo(() => {
     const searched = searchWorkspaces(workspaces, search);
@@ -113,13 +139,13 @@ export default function WorkspacesPage() {
     [workspaces, search, statusFilter]
   );
 
-
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
     setModalMode("create");
     setEditingWorkspaceId(null);
     setSelectedTemplateId(null);
     setForm(EMPTY_FORM);
+    setSubmitting(false);
   }, []);
 
   const openCreateModal = useCallback(() => {
@@ -136,7 +162,7 @@ export default function WorkspacesPage() {
     setForm({
       name: workspace.name ?? "",
       description: workspace.description ?? "",
-      category: workspace.category ?? "",
+      category: workspace.category ?? "general",
       icon: workspace.icon ?? "📁",
       color: workspace.color ?? "from-blue-500/20 to-indigo-500/10",
       accentColor: workspace.accentColor ?? "#4F8CFF",
@@ -158,50 +184,75 @@ export default function WorkspacesPage() {
     });
   }, []);
 
-  const parseTags = (tagsStr) =>
-    tagsStr
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     const name = form.name.trim();
-    if (!name) return;
+    if (!name || submitting) return;
 
     const payload = {
       name,
       description: form.description.trim(),
-      category: form.category.trim() || "Development",
+      category: form.category.trim() || "general",
       icon: form.icon || "📁",
       color: form.color,
       accentColor: form.accentColor,
-      tags: parseTags(form.tags),
     };
 
-    if (modalMode === "edit" && editingWorkspaceId) {
-      updateWorkspace(editingWorkspaceId, payload);
-    } else {
-      addWorkspace(payload);
+    setSubmitting(true);
+    try {
+      if (modalMode === "edit" && editingWorkspaceId) {
+        await updateWorkspace(editingWorkspaceId, payload);
+        showToast("Workspace updated", "success");
+      } else {
+        await addWorkspace(payload);
+        showToast("Workspace created", "success");
+      }
+      closeModal();
+    } catch (e) {
+      showToast(extractApiError(e), "error");
+      setSubmitting(false);
     }
+  }, [
+    form,
+    modalMode,
+    editingWorkspaceId,
+    submitting,
+    updateWorkspace,
+    addWorkspace,
+    closeModal,
+    showToast,
+  ]);
 
-    closeModal();
-  }, [form, modalMode, editingWorkspaceId, updateWorkspace, addWorkspace, closeModal]);
+  const runAction = useCallback(
+    async (action, successMessage) => {
+      try {
+        await action();
+        if (successMessage) showToast(successMessage, "success");
+      } catch (e) {
+        showToast(extractApiError(e), "error");
+      }
+    },
+    [showToast]
+  );
 
   const handleEnter = useCallback(
-    (workspace) => {
-      openWorkspace(workspace.id);
-      navigate(`/workspace/${workspace.id}`);
+    async (workspace) => {
+      try {
+        await openWorkspace(workspace.id);
+        navigate(`/workspace/${workspace.id}`);
+      } catch (e) {
+        showToast(extractApiError(e), "error");
+      }
     },
-    [openWorkspace, navigate]
+    [openWorkspace, navigate, showToast]
   );
 
   const handleDelete = useCallback(
     (workspace) => {
       const ok = window.confirm(`Delete "${workspace.name}"? This cannot be undone.`);
       if (!ok) return;
-      deleteWorkspace(workspace.id);
+      runAction(() => deleteWorkspace(workspace.id), "Workspace deleted");
     },
-    [deleteWorkspace]
+    [deleteWorkspace, runAction]
   );
 
   const makeCardProps = useCallback(
@@ -209,16 +260,17 @@ export default function WorkspacesPage() {
       onEnter: () => handleEnter(workspace),
       onEdit: () => openEditModal(workspace),
       onDelete: () => handleDelete(workspace),
-      onTogglePin: () => togglePinWorkspace(workspace.id),
-      onToggleFavorite: () => toggleFavoriteWorkspace(workspace.id),
-      onArchive: () => archiveWorkspace(workspace.id),
-      onRestore: () => restoreWorkspace(workspace.id),
-      onDuplicate: () => duplicateWorkspace(workspace.id),
+      onTogglePin: () => runAction(() => togglePinWorkspace(workspace.id)),
+      onToggleFavorite: () => runAction(() => toggleFavoriteWorkspace(workspace.id)),
+      onArchive: () => runAction(() => archiveWorkspace(workspace.id), "Workspace archived"),
+      onRestore: () => runAction(() => restoreWorkspace(workspace.id), "Workspace restored"),
+      onDuplicate: () => runAction(() => duplicateWorkspace(workspace.id), "Workspace duplicated"),
     }),
     [
       handleEnter,
       openEditModal,
       handleDelete,
+      runAction,
       togglePinWorkspace,
       toggleFavoriteWorkspace,
       archiveWorkspace,
@@ -236,7 +288,7 @@ export default function WorkspacesPage() {
     archivedWorkspaces.length > 0 && (statusFilter === "all" || statusFilter === "archived");
   const isFiltered =
     search.trim() !== "" ||
-    selectedCategory !== "All" ||
+    selectedCategory !== "all" ||
     statusFilter !== "all";
   const hasVisibleWorkspaces =
     pinnedWorkspaces.length > 0 ||
@@ -260,6 +312,16 @@ export default function WorkspacesPage() {
         onSortChange={setSortBy}
       />
 
+      {loading && workspaces.length === 0 && (
+        <p className="text-sm text-[#A0A6B1]">Loading workspaces...</p>
+      )}
+
+      {!loading && error && workspaces.length === 0 && (
+        <p className="text-sm text-red-400">
+          {extractApiError({ response: { data: error } })}
+        </p>
+      )}
+
       <WorkspaceModal
         isOpen={isModalOpen}
         mode={modalMode}
@@ -269,6 +331,7 @@ export default function WorkspacesPage() {
         onSubmit={handleSubmit}
         onSelectTemplate={handleSelectTemplate}
         selectedTemplateId={selectedTemplateId}
+        submitting={submitting}
       />
 
       {statusFilter !== "archived" && (
@@ -295,7 +358,7 @@ export default function WorkspacesPage() {
               />
             ))}
 
-            {!hasVisibleWorkspaces && (
+            {!loading && !hasVisibleWorkspaces && (
               <WorkspaceEmptyState onCreate={openCreateModal} isFiltered={isFiltered} />
             )}
 
@@ -326,7 +389,7 @@ export default function WorkspacesPage() {
         <ArchivedSection workspaces={archivedWorkspaces} cardProps={cardPropsFn} />
       )}
 
-      {statusFilter === "archived" && archivedWorkspaces.length === 0 && (
+      {statusFilter === "archived" && archivedWorkspaces.length === 0 && !loading && (
         <WorkspaceEmptyState onCreate={openCreateModal} isFiltered />
       )}
     </div>

@@ -4,5 +4,6 @@ export const authService = {
   login: (payload) => api.post("/auth/login", payload),
   logout: () => api.post("/auth/logout"),
   me: () => api.get("/auth/me"),
+  refresh: () => api.post("/auth/refresh"),
 };
 

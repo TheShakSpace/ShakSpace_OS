@@ -1,6 +1,7 @@
 const { success, created } = require('../utils/response');
 const { validateRequest } = require('../validators/validate');
 const workspacesService = require('../services/workspaces.service');
+const { normalizeWorkspaceQueryCategory } = require('../utils/workspaceNormalize');
 
 function parseBoolean(val) {
   if (val === undefined) return undefined;
@@ -12,35 +13,39 @@ function parseBoolean(val) {
   return undefined;
 }
 
+function buildPayload(body) {
+  const payload = {};
+  if (body.name !== undefined) payload.name = body.name;
+  if (body.description !== undefined) payload.description = body.description;
+  if (body.category !== undefined) payload.category = body.category;
+  if (body.color !== undefined) payload.color = body.color;
+  if (body.icon !== undefined) payload.icon = body.icon;
+  return payload;
+}
+
 async function list(req, res, next) {
   try {
-    console.log('[workspaces.controller] entering list()');
-
     validateRequest(req);
 
     const ownerId = req.user.id;
-
 
     const page = Math.max(1, Number(req.query.page || 1));
     const limitRaw = Number(req.query.limit || 20);
     const limit = Math.min(Math.max(1, limitRaw), 100);
 
     const q = req.query.q ? String(req.query.q) : undefined;
-
     const sortBy = req.query.sortBy ? String(req.query.sortBy) : 'createdAt';
     const sortOrder = req.query.sortOrder ? String(req.query.sortOrder) : 'desc';
-
-    const category = req.query.category ? String(req.query.category) : undefined;
+    const category = req.query.category
+      ? normalizeWorkspaceQueryCategory(req.query.category)
+      : undefined;
 
     const pinnedOnly = parseBoolean(req.query.pinnedOnly);
     const favoriteOnly = parseBoolean(req.query.favoriteOnly);
     const archivedOnly = parseBoolean(req.query.archivedOnly);
 
-
-    console.log('[workspaces.controller] before listWorkspaces()');
     const result = await workspacesService.listWorkspaces({
       ownerId,
-
       page,
       limit,
       q,
@@ -51,17 +56,9 @@ async function list(req, res, next) {
       favoriteOnly,
       archivedOnly,
     });
-    console.log('[workspaces.controller] after listWorkspaces()');
 
-    const resp = success(res, result);
-    console.log('[workspaces.controller] before success() send');
-
-
-    return resp;
-
-
+    return success(res, result);
   } catch (e) {
-
     return next(e);
   }
 }
@@ -83,14 +80,7 @@ async function create(req, res, next) {
   try {
     validateRequest(req);
     const ownerId = req.user.id;
-
-    const payload = {
-      name: req.body.name,
-      description: req.body.description,
-      category: req.body.category,
-      color: req.body.color,
-      icon: req.body.icon,
-    };
+    const payload = buildPayload(req.body);
 
     const workspace = await workspacesService.createWorkspace({ ownerId, payload });
     return created(res, { workspace });
@@ -104,14 +94,7 @@ async function update(req, res, next) {
     validateRequest(req);
     const ownerId = req.user.id;
     const workspaceId = req.params.workspaceId;
-
-    const payload = {
-      name: req.body.name,
-      description: req.body.description,
-      category: req.body.category,
-      color: req.body.color,
-      icon: req.body.icon,
-    };
+    const payload = buildPayload(req.body);
 
     const workspace = await workspacesService.updateWorkspace({ ownerId, workspaceId, payload });
     return success(res, { workspace });
@@ -226,4 +209,3 @@ module.exports = {
   open,
   stats,
 };
-

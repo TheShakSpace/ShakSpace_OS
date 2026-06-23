@@ -66,18 +66,18 @@ export default function WorkspaceFilters({
       <div className="flex flex-wrap gap-2">
         {WORKSPACE_CATEGORIES.map((c) => (
           <motion.button
-            key={c}
+            key={c.value}
             type="button"
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => onCategoryChange(c)}
+            onClick={() => onCategoryChange(c.value)}
             className={`px-3 py-1 rounded-full text-xs border transition-all cursor-pointer ${
-              selectedCategory === c
+              selectedCategory === c.value
                 ? "bg-[#4F8CFF]/20 border-[#4F8CFF]/60 text-white"
                 : "bg-white/[0.03] border-white/[0.10] text-[#A0A6B1] hover:text-white hover:border-[#4F8CFF]/40"
             }`}
           >
-            {c}
+            {c.label}
           </motion.button>
         ))}
       </div>

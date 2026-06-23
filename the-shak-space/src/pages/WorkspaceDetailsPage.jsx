@@ -3,16 +3,20 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "motion/react";
 
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
-import { normalizeId } from "../utils/workspaceHelpers";
+import { useToastStore } from "../stores/useToastStore";
+import { normalizeId, extractApiError } from "../utils/workspaceHelpers";
 import WorkspaceDetails from "../components/workspace/WorkspaceDetails";
 import WorkspaceModal, { EMPTY_FORM } from "../components/workspace/WorkspaceModal";
 
 export default function WorkspaceDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const showToast = useToastStore((state) => state.showToast);
 
   const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const loading = useWorkspaceStore((state) => state.loading);
   const getWorkspaceById = useWorkspaceStore((state) => state.getWorkspaceById);
+  const fetchWorkspace = useWorkspaceStore((state) => state.fetchWorkspace);
   const openWorkspace = useWorkspaceStore((state) => state.openWorkspace);
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
   const deleteWorkspace = useWorkspaceStore((state) => state.deleteWorkspace);
@@ -25,24 +29,39 @@ export default function WorkspaceDetailsPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
   const openedRef = useRef(false);
 
-  const workspace = getWorkspaceById(id) ?? workspaces.find(
-    (w) => normalizeId(w.id) === normalizeId(id)
-  );
+  const workspace =
+    getWorkspaceById(id) ??
+    workspaces.find((w) => normalizeId(w.id) === normalizeId(id));
 
   useEffect(() => {
-    if (!id || openedRef.current) return;
-    const ws = getWorkspaceById(id);
-    if (ws) {
-      openWorkspace(id);
-      openedRef.current = true;
+    if (!id) return;
+
+    const cached = getWorkspaceById(id);
+    if (cached) {
+      if (!openedRef.current) {
+        openWorkspace(id).catch(() => {});
+        openedRef.current = true;
+      }
+      return;
     }
-  }, [id, getWorkspaceById, openWorkspace]);
+
+    fetchWorkspace(id)
+      .then(() => {
+        if (!openedRef.current) {
+          openWorkspace(id).catch(() => {});
+          openedRef.current = true;
+        }
+      })
+      .catch((e) => showToast(extractApiError(e), "error"));
+  }, [id, getWorkspaceById, fetchWorkspace, openWorkspace, showToast]);
 
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
     setForm(EMPTY_FORM);
+    setSubmitting(false);
   }, []);
 
   const openEditModal = useCallback(() => {
@@ -50,7 +69,7 @@ export default function WorkspaceDetailsPage() {
     setForm({
       name: workspace.name ?? "",
       description: workspace.description ?? "",
-      category: workspace.category ?? "",
+      category: workspace.category ?? "general",
       icon: workspace.icon ?? "📁",
       color: workspace.color ?? "from-blue-500/20 to-indigo-500/10",
       accentColor: workspace.accentColor ?? "#4F8CFF",
@@ -59,30 +78,56 @@ export default function WorkspaceDetailsPage() {
     setIsModalOpen(true);
   }, [workspace]);
 
-  const handleSaveEdit = useCallback(() => {
-    if (!workspace || !form.name.trim()) return;
-    updateWorkspace(workspace.id, {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      category: form.category.trim() || "Development",
-      icon: form.icon || "📁",
-      color: form.color,
-      accentColor: form.accentColor,
-      tags: form.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-    });
-    closeModal();
-  }, [workspace, form, updateWorkspace, closeModal]);
+  const runAction = useCallback(
+    async (action, successMessage) => {
+      try {
+        await action();
+        if (successMessage) showToast(successMessage, "success");
+      } catch (e) {
+        showToast(extractApiError(e), "error");
+      }
+    },
+    [showToast]
+  );
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!workspace || !form.name.trim() || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await updateWorkspace(workspace.id, {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        category: form.category.trim() || "general",
+        icon: form.icon || "📁",
+        color: form.color,
+        accentColor: form.accentColor,
+      });
+      showToast("Workspace updated", "success");
+      closeModal();
+    } catch (e) {
+      showToast(extractApiError(e), "error");
+      setSubmitting(false);
+    }
+  }, [workspace, form, submitting, updateWorkspace, closeModal, showToast]);
 
   const handleDelete = useCallback(() => {
     if (!workspace) return;
     const ok = window.confirm(`Delete "${workspace.name}"? This cannot be undone.`);
     if (!ok) return;
-    deleteWorkspace(workspace.id);
-    navigate("/workspaces", { replace: true });
-  }, [workspace, deleteWorkspace, navigate]);
+    runAction(async () => {
+      await deleteWorkspace(workspace.id);
+      navigate("/workspaces", { replace: true });
+    }, "Workspace deleted");
+  }, [workspace, deleteWorkspace, navigate, runAction]);
+
+  if (loading && !workspace) {
+    return (
+      <div className="max-w-lg mx-auto py-20 text-center text-sm text-[#A0A6B1]">
+        Loading workspace...
+      </div>
+    );
+  }
 
   if (!workspace) {
     return (
@@ -109,17 +154,19 @@ export default function WorkspaceDetailsPage() {
   const actionHandlers = {
     onEdit: openEditModal,
     onDelete: handleDelete,
-    onTogglePin: () => togglePinWorkspace(workspace.id),
-    onToggleFavorite: () => toggleFavoriteWorkspace(workspace.id),
-    onArchive: () => {
-      archiveWorkspace(workspace.id);
-      navigate("/workspaces");
-    },
-    onRestore: () => restoreWorkspace(workspace.id),
-    onDuplicate: () => {
-      duplicateWorkspace(workspace.id);
-      navigate("/workspaces");
-    },
+    onTogglePin: () => runAction(() => togglePinWorkspace(workspace.id)),
+    onToggleFavorite: () => runAction(() => toggleFavoriteWorkspace(workspace.id)),
+    onArchive: () =>
+      runAction(async () => {
+        await archiveWorkspace(workspace.id);
+        navigate("/workspaces");
+      }, "Workspace archived"),
+    onRestore: () => runAction(() => restoreWorkspace(workspace.id), "Workspace restored"),
+    onDuplicate: () =>
+      runAction(async () => {
+        await duplicateWorkspace(workspace.id);
+        navigate("/workspaces");
+      }, "Workspace duplicated"),
   };
 
   return (
@@ -141,6 +188,7 @@ export default function WorkspaceDetailsPage() {
         onSubmit={handleSaveEdit}
         onSelectTemplate={() => {}}
         selectedTemplateId={null}
+        submitting={submitting}
       />
     </div>
   );

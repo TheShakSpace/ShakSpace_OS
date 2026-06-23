@@ -1,18 +1,24 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Plus } from "lucide-react";
+import { Grid3x3, List, Plus } from "lucide-react";
 
 import { useKnowledgeStore } from "../stores/useKnowledgeStore";
+import { useWorkspaceStore } from "../stores/useWorkspaceStore";
+import { useAuthStore } from "../stores/useAuthStore";
+import { useToastStore } from "../stores/useToastStore";
 import {
+  SIDEBAR_VIEWS,
   searchNotes,
   filterNotes,
-  enrichNotesWithCollection,
-  getKnowledgeStats,
-  getAllTags,
   getRecentNotes,
-  SIDEBAR_VIEWS,
+  getPinnedNotes,
+  getKnowledgeStats,
+  mergeServerStats,
+  getAllTags,
   normalizeId,
-  estimateReadTime,
+  extractApiError,
+  KNOWLEDGE_CATEGORIES,
 } from "../utils/knowledgeHelpers";
 
 import KnowledgeHero from "../components/knowledge/KnowledgeHero";
@@ -20,14 +26,10 @@ import KnowledgeSidebar from "../components/knowledge/KnowledgeSidebar";
 import KnowledgeToolbar from "../components/knowledge/KnowledgeToolbar";
 import KnowledgeCard from "../components/knowledge/KnowledgeCard";
 import KnowledgeEmptyState from "../components/knowledge/KnowledgeEmptyState";
-import KnowledgeCollections from "../components/knowledge/KnowledgeCollections";
 import KnowledgePinned from "../components/knowledge/KnowledgePinned";
 import KnowledgeRecent from "../components/knowledge/KnowledgeRecent";
 import KnowledgeModal from "../components/knowledge/KnowledgeModal";
-import {
-  EMPTY_NOTE_FORM,
-  EMPTY_COLLECTION_FORM,
-} from "../components/knowledge/knowledgeModalForms";
+import { EMPTY_NOTE_FORM } from "../components/knowledge/knowledgeModalForms";
 
 const VIEW_TITLES = {
   [SIDEBAR_VIEWS.ALL]: "All Notes",
@@ -35,287 +37,270 @@ const VIEW_TITLES = {
   [SIDEBAR_VIEWS.PINNED]: "Pinned Notes",
   [SIDEBAR_VIEWS.RECENT]: "Recent Notes",
   [SIDEBAR_VIEWS.ARCHIVED]: "Archived Notes",
-  [SIDEBAR_VIEWS.TRASH]: "Trash",
 };
 
 export default function KnowledgeHubPage() {
-  const notes = useKnowledgeStore((s) => s.notes);
-  const collections = useKnowledgeStore((s) => s.collections);
-  const addNote = useKnowledgeStore((s) => s.addNote);
-  const updateNote = useKnowledgeStore((s) => s.updateNote);
-  const duplicateNote = useKnowledgeStore((s) => s.duplicateNote);
-  const togglePinNote = useKnowledgeStore((s) => s.togglePinNote);
-  const toggleFavoriteNote = useKnowledgeStore((s) => s.toggleFavoriteNote);
-  const archiveNote = useKnowledgeStore((s) => s.archiveNote);
-  const restoreNote = useKnowledgeStore((s) => s.restoreNote);
-  const trashNote = useKnowledgeStore((s) => s.trashNote);
-  const restoreFromTrash = useKnowledgeStore((s) => s.restoreFromTrash);
-  const permanentlyDeleteNote = useKnowledgeStore((s) => s.permanentlyDeleteNote);
-  const openNote = useKnowledgeStore((s) => s.openNote);
-  const addCollection = useKnowledgeStore((s) => s.addCollection);
-  const emptyTrash = useKnowledgeStore((s) => s.emptyTrash);
+  const navigate = useNavigate();
+  const showToast = useToastStore((s) => s.showToast);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const initialLoadRef = useRef(false);
+
+  const knowledge = useKnowledgeStore((s) => s.knowledge);
+  const loading = useKnowledgeStore((s) => s.loading);
+  const error = useKnowledgeStore((s) => s.error);
+  const serverStats = useKnowledgeStore((s) => s.stats);
+  const storeTags = useKnowledgeStore((s) => s.tags);
+
+  const createKnowledge = useKnowledgeStore((s) => s.createKnowledge);
+  const updateKnowledge = useKnowledgeStore((s) => s.updateKnowledge);
+  const deleteKnowledge = useKnowledgeStore((s) => s.deleteKnowledge);
+  const togglePin = useKnowledgeStore((s) => s.togglePin);
+  const toggleFavorite = useKnowledgeStore((s) => s.toggleFavorite);
+  const archiveKnowledge = useKnowledgeStore((s) => s.archiveKnowledge);
+  const restore = useKnowledgeStore((s) => s.restore);
+  const duplicateKnowledge = useKnowledgeStore((s) => s.duplicateKnowledge);
+  const openKnowledge = useKnowledgeStore((s) => s.openKnowledge);
+  const setFilters = useKnowledgeStore((s) => s.setFilters);
+
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
 
   const [activeView, setActiveView] = useState(SIDEBAR_VIEWS.ALL);
-  const [activeCollectionId, setActiveCollectionId] = useState(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedTag, setSelectedTag] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [workspaceFilter, setWorkspaceFilter] = useState("");
+  const [viewMode, setViewMode] = useState("grid");
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState("note");
   const [modalMode, setModalMode] = useState("create");
   const [noteForm, setNoteForm] = useState(EMPTY_NOTE_FORM);
-  const [collectionForm, setCollectionForm] = useState(EMPTY_COLLECTION_FORM);
   const [editingNoteId, setEditingNoteId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const enrichedNotes = useMemo(
-    () => enrichNotesWithCollection(notes, collections),
-    [notes, collections]
-  );
+  useEffect(() => {
+    if (!isAuthenticated || initialLoadRef.current) return;
+    initialLoadRef.current = true;
+    let active = true;
+    const load = async () => {
+      try {
+        await fetchWorkspaces().catch(() => {});
+        await useKnowledgeStore.getState().refresh();
+        await useKnowledgeStore.getState().fetchTags();
+      } catch (e) {
+        if (active) showToast(extractApiError(e), "error");
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, fetchWorkspaces, showToast]);
 
-  const stats = useMemo(() => getKnowledgeStats(notes, collections), [notes, collections]);
-  const allTags = useMemo(() => getAllTags(notes), [notes]);
+  useEffect(() => {
+    setFilters({
+      workspaceId: workspaceFilter || null,
+      category: selectedCategory,
+      tag: selectedTag,
+    });
+  }, [workspaceFilter, selectedCategory, selectedTag, setFilters]);
+
+  const stats = useMemo(() => {
+    const client = getKnowledgeStats(knowledge);
+    return mergeServerStats(client, serverStats);
+  }, [knowledge, serverStats]);
+
+  const allTags = useMemo(() => {
+    const fromNotes = getAllTags(knowledge);
+    const merged = new Set([...fromNotes, ...(storeTags ?? [])]);
+    return [...merged].sort();
+  }, [knowledge, storeTags]);
 
   const noteCounts = useMemo(() => {
-    const active = notes.filter((n) => !n.trashed);
-    const counts = {
-      [SIDEBAR_VIEWS.ALL]: active.filter((n) => !n.archived).length,
-      [SIDEBAR_VIEWS.FAVORITES]: active.filter((n) => n.favorite && !n.archived).length,
-      [SIDEBAR_VIEWS.PINNED]: active.filter((n) => n.pinned && !n.archived).length,
-      [SIDEBAR_VIEWS.RECENT]: active.filter((n) => n.lastOpened && !n.archived).length,
-      [SIDEBAR_VIEWS.ARCHIVED]: active.filter((n) => n.archived).length,
-      [SIDEBAR_VIEWS.TRASH]: notes.filter((n) => n.trashed).length,
+    const active = knowledge.filter((n) => !n.archived);
+    return {
+      [SIDEBAR_VIEWS.ALL]: active.length,
+      [SIDEBAR_VIEWS.FAVORITES]: active.filter((n) => n.favorite).length,
+      [SIDEBAR_VIEWS.PINNED]: active.filter((n) => n.pinned).length,
+      [SIDEBAR_VIEWS.RECENT]: active.filter((n) => n.lastOpened).length,
+      [SIDEBAR_VIEWS.ARCHIVED]: knowledge.filter((n) => n.archived).length,
     };
-    collections.forEach((col) => {
-      counts[`col-${col.id}`] = active.filter(
-        (n) => normalizeId(n.collectionId) === normalizeId(col.id) && !n.archived
-      ).length;
-    });
-    return counts;
-  }, [notes, collections]);
+  }, [knowledge]);
 
   const filteredNotes = useMemo(() => {
-    let result = filterNotes(enrichedNotes, {
+    let result = filterNotes(knowledge, {
       view: activeView,
-      collectionId: activeCollectionId,
+      category: selectedCategory,
+      workspaceId: workspaceFilter || null,
       sortBy,
     });
-
     result = searchNotes(result, search);
-
-    if (statusFilter === "favorites") {
-      result = result.filter((n) => n.favorite);
-    } else if (statusFilter === "pinned") {
-      result = result.filter((n) => n.pinned);
-    } else if (statusFilter === "archived") {
-      result = result.filter((n) => n.archived);
-    }
-
-    if (selectedTag) {
-      result = result.filter((n) => (n.tags ?? []).includes(selectedTag));
-    }
-
+    if (statusFilter === "favorites") result = result.filter((n) => n.favorite);
+    if (statusFilter === "pinned") result = result.filter((n) => n.pinned);
+    if (statusFilter === "archived") result = result.filter((n) => n.archived);
+    if (selectedTag) result = result.filter((n) => (n.tags ?? []).includes(selectedTag));
     return result;
-  }, [
-    enrichedNotes,
-    activeView,
-    activeCollectionId,
-    sortBy,
-    search,
-    statusFilter,
-    selectedTag,
-  ]);
+  }, [knowledge, activeView, selectedCategory, workspaceFilter, sortBy, search, statusFilter, selectedTag]);
 
   const pinnedNotes = useMemo(() => {
-    if (activeView !== SIDEBAR_VIEWS.ALL || activeCollectionId) return [];
-    return filteredNotes.filter((n) => n.pinned && !n.archived && !n.trashed).slice(0, 6);
-  }, [filteredNotes, activeView, activeCollectionId]);
+    if (activeView !== SIDEBAR_VIEWS.ALL) return [];
+    return getPinnedNotes(
+      searchNotes(knowledge.filter((n) => !n.archived), search),
+      6
+    );
+  }, [knowledge, search, activeView]);
 
   const recentNotes = useMemo(() => {
-    if (activeView !== SIDEBAR_VIEWS.ALL || activeCollectionId) return [];
-    const recent = getRecentNotes(
-      enrichedNotes.filter((n) => searchNotes([n], search).length > 0 || !search.trim()),
-      5
-    );
+    if (activeView !== SIDEBAR_VIEWS.ALL) return [];
+    const recent = getRecentNotes(searchNotes(knowledge.filter((n) => !n.archived), search), 5);
     const pinnedIds = new Set(pinnedNotes.map((n) => normalizeId(n.id)));
     return recent.filter((n) => !pinnedIds.has(normalizeId(n.id)));
-  }, [enrichedNotes, search, activeView, activeCollectionId, pinnedNotes]);
+  }, [knowledge, search, activeView, pinnedNotes]);
 
   const mainNotes = useMemo(() => {
     if (activeView === SIDEBAR_VIEWS.PINNED || activeView === SIDEBAR_VIEWS.RECENT) {
       return filteredNotes;
     }
-    const excludeIds = new Set([
-      ...pinnedNotes,
-      ...recentNotes,
-    ].map((n) => normalizeId(n.id)));
-    return filteredNotes.filter((n) => !excludeIds.has(normalizeId(n.id)));
+    const exclude = new Set([...pinnedNotes, ...recentNotes].map((n) => normalizeId(n.id)));
+    return filteredNotes.filter((n) => !exclude.has(normalizeId(n.id)));
   }, [filteredNotes, activeView, pinnedNotes, recentNotes]);
-
-  const viewTitle = activeCollectionId
-    ? collections.find((c) => c.id === activeCollectionId)?.name ?? "Collection"
-    : VIEW_TITLES[activeView] ?? "Notes";
-
-  const showCollectionsGrid =
-    activeView === SIDEBAR_VIEWS.ALL && !activeCollectionId && !search.trim();
-
-  const isFiltered =
-    search.trim() !== "" || statusFilter !== "all" || selectedTag !== "";
 
   const closeModal = useCallback(() => {
     setModalOpen(false);
     setModalMode("create");
     setEditingNoteId(null);
     setNoteForm(EMPTY_NOTE_FORM);
-    setCollectionForm(EMPTY_COLLECTION_FORM);
+    setSubmitting(false);
   }, []);
 
-  const openCreateNote = useCallback(() => {
-    setModalType("note");
+  const openCreateModal = useCallback(() => {
+    const defaultWs = workspaces.find((w) => !w.archived)?.id ?? "";
     setModalMode("create");
     setEditingNoteId(null);
-    setNoteForm({
-      ...EMPTY_NOTE_FORM,
-      collectionId: activeCollectionId ?? "",
-    });
+    setNoteForm({ ...EMPTY_NOTE_FORM, workspaceId: workspaceFilter || defaultWs });
     setModalOpen(true);
-  }, [activeCollectionId]);
+  }, [workspaces, workspaceFilter]);
 
-  const openCreateCollection = useCallback(() => {
-    setModalType("collection");
-    setModalMode("create");
-    setCollectionForm(EMPTY_COLLECTION_FORM);
-    setModalOpen(true);
-  }, []);
-
-  const openEditNote = useCallback((note) => {
-    setModalType("note");
+  const openEditModal = useCallback((note) => {
     setModalMode("edit");
     setEditingNoteId(note.id);
     setNoteForm({
       title: note.title ?? "",
-      description: note.description ?? "",
-      collectionId: note.collectionId ?? "",
+      summary: note.summary ?? "",
+      content: note.content ?? "",
+      workspaceId: note.workspaceId ?? "",
+      category: note.category ?? "general",
+      icon: note.icon ?? "📝",
+      accentColor: note.accentColor ?? "#8B5CF6",
       tags: (note.tags ?? []).join(", "),
     });
     setModalOpen(true);
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    if (modalType === "collection") {
-      const name = collectionForm.name.trim();
-      if (!name) return;
-      addCollection({
-        name,
-        description: collectionForm.description.trim(),
-        icon: collectionForm.icon || "📂",
-        color: collectionForm.color,
-      });
-      closeModal();
+  const handleSubmit = useCallback(async () => {
+    const title = noteForm.title.trim();
+    if (!title || submitting) return;
+    if (!noteForm.workspaceId) {
+      showToast("Select a workspace", "error");
       return;
     }
 
-    const title = noteForm.title.trim();
-    if (!title) return;
-
     const payload = {
       title,
-      description: noteForm.description.trim(),
-      collectionId: noteForm.collectionId || null,
+      summary: noteForm.summary?.trim() ?? "",
+      content: noteForm.content ?? "",
+      workspaceId: noteForm.workspaceId,
+      category: noteForm.category || "general",
+      icon: noteForm.icon || "📝",
+      accentColor: noteForm.accentColor,
       tags: noteForm.tags
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
-      readTime: estimateReadTime(noteForm.description),
     };
 
-    if (modalMode === "edit" && editingNoteId) {
-      updateNote(editingNoteId, payload);
-    } else {
-      addNote(payload);
+    setSubmitting(true);
+    try {
+      if (modalMode === "edit" && editingNoteId) {
+        await updateKnowledge(editingNoteId, payload);
+        showToast("Note updated", "success");
+      } else {
+        const created = await createKnowledge(payload);
+        showToast("Note created", "success");
+        closeModal();
+        if (created?.id) navigate(`/knowledge/${created.id}`);
+        return;
+      }
+      closeModal();
+    } catch (e) {
+      showToast(extractApiError(e), "error");
+      setSubmitting(false);
     }
-    closeModal();
-  }, [
-    modalType,
-    modalMode,
-    noteForm,
-    collectionForm,
-    editingNoteId,
-    addNote,
-    updateNote,
-    addCollection,
-    closeModal,
-  ]);
+  }, [noteForm, submitting, modalMode, editingNoteId, createKnowledge, updateKnowledge, closeModal, showToast, navigate]);
+
+  const runAction = useCallback(
+    async (action, msg) => {
+      try {
+        await action();
+        if (msg) showToast(msg, "success");
+      } catch (e) {
+        showToast(extractApiError(e), "error");
+      }
+    },
+    [showToast]
+  );
 
   const handleOpenNote = useCallback(
-    (note) => {
-      openNote(note.id);
+    async (note) => {
+      try {
+        await openKnowledge(note.id);
+        navigate(`/knowledge/${note.id}`);
+      } catch (e) {
+        showToast(extractApiError(e), "error");
+      }
     },
-    [openNote]
+    [openKnowledge, navigate, showToast]
   );
 
   const makeHandlers = useCallback(
     (note) => ({
       onOpen: () => handleOpenNote(note),
-      onEdit: () => openEditNote(note),
-      onTogglePin: () => togglePinNote(note.id),
-      onToggleFavorite: () => toggleFavoriteNote(note.id),
-      onDuplicate: () => duplicateNote(note.id),
-      onArchive: () => archiveNote(note.id),
-      onRestore: () => restoreNote(note.id),
-      onTrash: () => trashNote(note.id),
-      onRestoreFromTrash: () => restoreFromTrash(note.id),
-      onPermanentDelete: () => {
-        const ok = window.confirm("Permanently delete this note? This cannot be undone.");
+      onEdit: () => openEditModal(note),
+      onTogglePin: () => runAction(() => togglePin(note.id)),
+      onToggleFavorite: () => runAction(() => toggleFavorite(note.id)),
+      onDuplicate: () => runAction(() => duplicateKnowledge(note.id), "Note duplicated"),
+      onArchive: () => runAction(() => archiveKnowledge(note.id), "Note archived"),
+      onRestore: () => runAction(() => restore(note.id), "Note restored"),
+      onDelete: () => {
+        const ok = window.confirm(`Delete "${note.title}"? This cannot be undone.`);
         if (!ok) return;
-        permanentlyDeleteNote(note.id);
+        runAction(() => deleteKnowledge(note.id), "Note deleted");
       },
     }),
-    [
-      handleOpenNote,
-      openEditNote,
-      togglePinNote,
-      toggleFavoriteNote,
-      duplicateNote,
-      archiveNote,
-      restoreNote,
-      trashNote,
-      restoreFromTrash,
-      permanentlyDeleteNote,
-    ]
+    [handleOpenNote, openEditModal, runAction, togglePin, toggleFavorite, duplicateKnowledge, archiveKnowledge, restore, deleteKnowledge]
   );
 
-  const handleViewChange = useCallback((view) => {
-    setActiveView(view);
-    setActiveCollectionId(null);
-    setStatusFilter("all");
-  }, []);
+  const isFiltered =
+    search.trim() !== "" ||
+    statusFilter !== "all" ||
+    selectedTag !== "" ||
+    selectedCategory !== "all" ||
+    workspaceFilter !== "";
 
-  const handleCollectionSelect = useCallback((id) => {
-    setActiveCollectionId(id);
-    setActiveView(SIDEBAR_VIEWS.ALL);
-    setStatusFilter("all");
-  }, []);
-
-  const handleEmptyTrash = useCallback(() => {
-    const ok = window.confirm("Permanently delete all items in trash?");
-    if (!ok) return;
-    emptyTrash();
-  }, [emptyTrash]);
+  const gridClass =
+    viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "flex flex-col gap-2";
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 max-w-7xl mx-auto">
       <KnowledgeSidebar
         activeView={activeView}
-        activeCollectionId={activeCollectionId}
-        collections={collections}
         noteCounts={noteCounts}
-        onViewChange={handleViewChange}
-        onCollectionSelect={handleCollectionSelect}
-        onNewCollection={openCreateCollection}
-        onEmptyTrash={handleEmptyTrash}
-        trashCount={stats.trash}
+        onViewChange={(v) => {
+          setActiveView(v);
+          setStatusFilter("all");
+        }}
       />
 
       <div className="flex-1 min-w-0 space-y-4">
@@ -331,20 +316,41 @@ export default function KnowledgeHubPage() {
           selectedTag={selectedTag}
           onTagChange={setSelectedTag}
           tags={allTags}
-          onNewNote={openCreateNote}
-          viewTitle={viewTitle}
+          onNewNote={openCreateModal}
+          viewTitle={VIEW_TITLES[activeView] ?? "Notes"}
+          workspaceFilter={workspaceFilter}
+          onWorkspaceFilterChange={setWorkspaceFilter}
+          workspaces={workspaces.filter((w) => !w.archived)}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          categories={KNOWLEDGE_CATEGORIES}
         />
 
-        {showCollectionsGrid && (
-          <KnowledgeCollections
-            collections={collections}
-            noteCounts={noteCounts}
-            activeId={activeCollectionId}
-            onSelect={handleCollectionSelect}
-          />
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            className={`p-2 rounded-lg cursor-pointer ${viewMode === "grid" ? "bg-purple-500/20 text-purple-300" : "text-[#A0A6B1]"}`}
+          >
+            <Grid3x3 size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            className={`p-2 rounded-lg cursor-pointer ${viewMode === "list" ? "bg-purple-500/20 text-purple-300" : "text-[#A0A6B1]"}`}
+          >
+            <List size={16} />
+          </button>
+        </div>
+
+        {loading && knowledge.length === 0 && (
+          <p className="text-sm text-[#A0A6B1]">Loading knowledge...</p>
+        )}
+        {!loading && error && knowledge.length === 0 && (
+          <p className="text-sm text-red-400">{extractApiError({ response: { data: error } })}</p>
         )}
 
-        {activeView === SIDEBAR_VIEWS.ALL && !activeCollectionId && (
+        {activeView === SIDEBAR_VIEWS.ALL && (
           <div className="space-y-4">
             <KnowledgePinned notes={pinnedNotes} makeHandlers={makeHandlers} />
             <KnowledgeRecent notes={recentNotes} makeHandlers={makeHandlers} />
@@ -352,52 +358,39 @@ export default function KnowledgeHubPage() {
         )}
 
         <section className="space-y-2.5">
-          {mainNotes.length > 0 && activeView === SIDEBAR_VIEWS.ALL && !activeCollectionId && (
+          {mainNotes.length > 0 && activeView === SIDEBAR_VIEWS.ALL && (
             <h2 className="text-sm font-black text-white tracking-tight">All Notes</h2>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr">
+          <div className={gridClass}>
             {mainNotes.map((note, i) => (
               <KnowledgeCard
                 key={note.id}
                 note={note}
                 index={i}
                 handlers={makeHandlers(note)}
+                listView={viewMode === "list"}
+                workspaceName={
+                  workspaces.find((w) => normalizeId(w.id) === normalizeId(note.workspaceId))?.name
+                }
               />
             ))}
 
-            {mainNotes.length === 0 &&
-              pinnedNotes.length === 0 &&
-              recentNotes.length === 0 && (
-                <KnowledgeEmptyState
-                  onCreate={
-                    activeView === SIDEBAR_VIEWS.TRASH ? null : openCreateNote
-                  }
-                  isFiltered={isFiltered || activeView !== SIDEBAR_VIEWS.ALL}
-                  viewLabel={
-                    activeView === SIDEBAR_VIEWS.TRASH ? "items in trash" : "notes"
-                  }
-                />
-              )}
+            {mainNotes.length === 0 && pinnedNotes.length === 0 && recentNotes.length === 0 && !loading && (
+              <KnowledgeEmptyState onCreate={openCreateModal} isFiltered={isFiltered} viewLabel="notes" />
+            )}
 
-            {mainNotes.length > 0 &&
-              activeView === SIDEBAR_VIEWS.ALL &&
-              !activeCollectionId && (
-                <motion.button
-                  type="button"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  whileHover={{ scale: 1.02, y: -3 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={openCreateNote}
-                  className="h-full min-h-[140px] p-3.5 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-purple-500/50 hover:bg-white/[0.02] flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer group"
-                >
-                  <div className="p-2.5 rounded-full bg-white/[0.04] text-[#A0A6B1] group-hover:text-white group-hover:scale-110 transition-all">
-                    <Plus size={18} />
-                  </div>
-                  <span className="text-xs font-bold text-white">New Note</span>
-                </motion.button>
-              )}
+            {mainNotes.length > 0 && activeView === SIDEBAR_VIEWS.ALL && (
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02, y: -3 }}
+                onClick={openCreateModal}
+                className="min-h-[140px] p-3.5 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-purple-500/50 flex flex-col items-center justify-center gap-2 cursor-pointer"
+              >
+                <Plus size={18} className="text-[#A0A6B1]" />
+                <span className="text-xs font-bold text-white">New Note</span>
+              </motion.button>
+            )}
           </div>
         </section>
       </div>
@@ -405,12 +398,12 @@ export default function KnowledgeHubPage() {
       <KnowledgeModal
         isOpen={modalOpen}
         mode={modalMode}
-        type={modalType}
-        form={modalType === "note" ? noteForm : collectionForm}
-        onFormChange={modalType === "note" ? setNoteForm : setCollectionForm}
-        collections={collections}
+        form={noteForm}
+        onFormChange={setNoteForm}
+        workspaces={workspaces.filter((w) => !w.archived)}
         onClose={closeModal}
         onSubmit={handleSubmit}
+        submitting={submitting}
       />
     </div>
   );

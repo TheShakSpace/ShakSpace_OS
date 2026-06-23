@@ -13,7 +13,8 @@ import WorkspaceStats from "./WorkspaceStats";
 import WorkspaceActivity from "./WorkspaceActivity";
 import WorkspaceStorage from "./WorkspaceStorage";
 import WorkspaceActions from "./WorkspaceActions";
-import { formatDate } from "../../utils/workspaceHelpers";
+import WorkspaceKnowledgeList from "./WorkspaceKnowledgeList";
+import { formatDate, formatCategoryLabel } from "../../utils/workspaceHelpers";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
@@ -47,6 +48,8 @@ export default function WorkspaceDetails({
 }) {
   if (!workspace) return null;
 
+  const accentHex = workspace.accentColor ?? "#4F8CFF";
+
   return (
     <div className="space-y-8">
       <motion.div
@@ -55,9 +58,10 @@ export default function WorkspaceDetails({
         className="relative p-6 md:p-8 rounded-2xl bg-gradient-to-br from-white/[0.05] to-transparent border border-white/[0.08] overflow-hidden"
       >
         <div
-          className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-tr ${
-            workspace.color ?? "from-blue-500/20 to-indigo-500/10"
-          } blur-3xl opacity-40 pointer-events-none`}
+          className="absolute top-0 right-0 w-64 h-64 blur-3xl opacity-40 pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at top right, ${accentHex}55, transparent 70%)`,
+          }}
         />
 
         <div className="relative z-10">
@@ -80,7 +84,7 @@ export default function WorkspaceDetails({
                     {workspace.name}
                   </h1>
                   <span className="px-2 py-0.5 bg-white/[0.06] border border-white/[0.10] text-[9px] font-bold uppercase text-[#4F8CFF] rounded-full">
-                    {workspace.category}
+                    {formatCategoryLabel(workspace.category)}
                   </span>
                 </div>
                 <p className="text-sm text-[#A0A6B1] max-w-xl">
@@ -152,7 +156,7 @@ export default function WorkspaceDetails({
           <PlaceholderPanel title="Documents" count={workspace.documents ?? 0} icon={FileText} />
         )}
         {activeTab === "knowledge" && (
-          <PlaceholderPanel title="Knowledge Base" count={workspace.knowledge ?? 0} icon={BookOpen} />
+          <WorkspaceKnowledgeList workspaceId={workspace.id} />
         )}
         {activeTab === "ai" && (
           <PlaceholderPanel title="AI Sessions" count={workspace.aiChats ?? 0} icon={Bot} />

@@ -1,8 +1,11 @@
 import { create } from "zustand";
 import { authService } from "../services/authService";
 
-export const useAuthStore = create((set) => ({
+function extractUser(res) {
+  return res?.data?.data?.user ?? res?.data?.user ?? null;
+}
 
+export const useAuthStore = create((set) => ({
   user: null,
   isAuthenticated: false,
   authLoading: true,
@@ -12,12 +15,27 @@ export const useAuthStore = create((set) => ({
     set({ authLoading: true, validationError: null });
     try {
       const res = await authService.me();
-      const userProfile = res?.data?.user ?? res?.data;
-      set({ user: userProfile ?? null, isAuthenticated: !!userProfile, authLoading: false });
-      return userProfile ?? null;
-    } catch (e) {
-      set({ user: null, isAuthenticated: false, authLoading: false });
-      return null;
+      const userProfile = extractUser(res);
+      set({
+        user: userProfile,
+        isAuthenticated: Boolean(userProfile?.id || userProfile?.email),
+        authLoading: false,
+      });
+      return userProfile;
+    } catch {
+      try {
+        const refreshRes = await authService.refresh();
+        const userProfile = extractUser(refreshRes);
+        set({
+          user: userProfile,
+          isAuthenticated: Boolean(userProfile?.id || userProfile?.email),
+          authLoading: false,
+        });
+        return userProfile;
+      } catch {
+        set({ user: null, isAuthenticated: false, authLoading: false });
+        return null;
+      }
     }
   },
 
@@ -25,13 +43,19 @@ export const useAuthStore = create((set) => ({
     set({ authLoading: true, validationError: null });
     try {
       const res = await authService.login({ email, password });
-      const userProfile = res?.data?.user ?? res?.data;
-      set({ user: userProfile ?? null, isAuthenticated: !!userProfile, authLoading: false });
-      return userProfile ?? null;
+      const userProfile = extractUser(res);
+      set({
+        user: userProfile,
+        isAuthenticated: Boolean(userProfile?.id || userProfile?.email),
+        authLoading: false,
+      });
+      return userProfile;
     } catch (err) {
       const data = err?.response?.data;
       const messages =
+        data?.error?.details ??
         data?.errors ??
+        data?.error?.message ??
         data?.message ??
         data?.error ??
         data ??
@@ -57,4 +81,3 @@ export const useAuthStore = create((set) => ({
     set({ user: null, isAuthenticated: false, authLoading: false });
   },
 }));
-

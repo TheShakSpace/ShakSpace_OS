@@ -1,48 +1,86 @@
 import { create } from "zustand";
-import { normalizeId } from "../utils/workspaceHelpers";
+import {
+  normalizeId,
+  normalizeApiPayload,
+  looksLikeHex,
+  looksLikeGradient,
+} from "../utils/workspaceHelpers";
 import { workspaceService } from "../services/workspaceService";
 
 function safeRollback(set, prevSnapshot) {
   set(() => prevSnapshot);
 }
 
+function extractWorkspace(res) {
+  return res?.data?.data?.workspace ?? res?.data?.workspace ?? null;
+}
+
+function extractList(res) {
+  const list = res?.data?.data?.items ?? res?.data?.workspaces ?? res?.data?.results ?? [];
+  return Array.isArray(list) ? list : [];
+}
+
+function extractPagination(res) {
+  return res?.data?.data?.pagination ?? res?.data?.pagination ?? null;
+}
+
+function extractStats(res) {
+  return res?.data?.data ?? res?.data ?? null;
+}
 
 function normalizeWorkspace(w) {
-  // Backend is source-of-truth; minimal normalization for UI helpers.
+  if (!w) return null;
+
+  const id = w.id ?? w._id;
+  const hexColor =
+    looksLikeHex(w.color) && !looksLikeGradient(w.color)
+      ? w.color
+      : looksLikeHex(w.accentColor)
+        ? w.accentColor
+        : "#4F8CFF";
+
   return {
     ...w,
-    pinned: Boolean(w?.pinned),
-    favorite: Boolean(w?.favorite),
-    archived: Boolean(w?.archived),
-    tags: Array.isArray(w?.tags) ? w.tags : [],
-    activity: Array.isArray(w?.activity) ? w.activity : [],
-    createdAt: w?.createdAt ?? w?.updatedAt ?? null,
-    updatedAt: w?.updatedAt ?? null,
-    lastOpened: w?.lastOpened ?? null,
+    id: id ? String(id) : undefined,
+    pinned: Boolean(w.pinned),
+    favorite: Boolean(w.favorite),
+    archived: Boolean(w.archived),
+    accentColor: hexColor,
+    color: looksLikeGradient(w.color) ? w.color : hexColor,
+    tags: Array.isArray(w.tags) ? w.tags : [],
+    activity: Array.isArray(w.activity) ? w.activity : [],
+    createdAt: w.createdAt ?? w.updatedAt ?? null,
+    updatedAt: w.updatedAt ?? null,
+    lastOpened: w.lastOpened ?? null,
   };
 }
 
-export const useWorkspaceStore = create((set, get) => ({
-  // Cache
-  workspaces: [],
+function replaceWorkspaceInList(workspaces, target, workspace) {
+  return workspaces.map((w) =>
+    normalizeId(w.id) === target && workspace ? workspace : w
+  );
+}
 
-  // Single selection/current
+async function refreshAll(get) {
+  await Promise.all([get().fetchWorkspaces(), get().fetchStats()]);
+}
+
+export const useWorkspaceStore = create((set, get) => ({
+  workspaces: [],
   selectedWorkspace: null,
   currentWorkspace: null,
-
-  // UI states
   loading: false,
   error: null,
-
-  // Stats cache
+  pagination: null,
   stats: null,
   statsLoading: false,
   statsError: null,
+  _listRequestId: 0,
 
   fetchWorkspaces: async ({
     q,
-    page,
-    limit,
+    page = 1,
+    limit = 100,
     sortBy,
     sortOrder,
     category,
@@ -50,7 +88,9 @@ export const useWorkspaceStore = create((set, get) => ({
     favoriteOnly,
     archivedOnly,
   } = {}) => {
-    set({ loading: true, error: null });
+    const requestId = get()._listRequestId + 1;
+    set({ loading: true, error: null, _listRequestId: requestId });
+
     try {
       const res = await workspaceService.getAllWorkspaces({
         q,
@@ -64,19 +104,19 @@ export const useWorkspaceStore = create((set, get) => ({
         archivedOnly,
       });
 
-      const list =
-        res?.data?.data?.items ??
-        res?.data?.workspaces ??
-        res?.data?.results ??
-        res?.data ??
-        [];
+      if (get()._listRequestId !== requestId) {
+        return get().workspaces;
+      }
 
-      const workspaces = Array.isArray(list) ? list.map(normalizeWorkspace) : [];
+      const workspaces = extractList(res).map(normalizeWorkspace);
+      const pagination = extractPagination(res);
 
-      set({ workspaces, loading: false, error: null });
+      set({ workspaces, pagination, loading: false, error: null });
       return workspaces;
     } catch (e) {
-      set({ loading: false, error: e?.response?.data ?? e?.message ?? String(e) });
+      if (get()._listRequestId === requestId) {
+        set({ loading: false, error: e?.response?.data ?? e?.message ?? String(e) });
+      }
       throw e;
     }
   },
@@ -90,8 +130,24 @@ export const useWorkspaceStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const res = await workspaceService.getWorkspace(id);
-      const workspace = normalizeWorkspace(res?.data?.workspace ?? res?.data ?? null);
-      set({ currentWorkspace: workspace, selectedWorkspace: workspace, loading: false });
+      const workspace = normalizeWorkspace(extractWorkspace(res));
+
+      set((state) => {
+        const target = normalizeId(id);
+        const exists = state.workspaces.some((w) => normalizeId(w.id) === target);
+        return {
+          workspaces: exists
+            ? replaceWorkspaceInList(state.workspaces, target, workspace)
+            : workspace
+              ? [workspace, ...state.workspaces]
+              : state.workspaces,
+          currentWorkspace: workspace,
+          selectedWorkspace: workspace,
+          loading: false,
+          error: null,
+        };
+      });
+
       return workspace;
     } catch (e) {
       set({ loading: false, error: e?.response?.data ?? e?.message ?? String(e) });
@@ -101,65 +157,21 @@ export const useWorkspaceStore = create((set, get) => ({
 
   createWorkspace: async (payload) => {
     const prevSnapshot = { ...get() };
+    const outgoingPayload = normalizeApiPayload(payload);
+
     set({ loading: true, error: null });
 
-    // Backend payload normalization (do NOT change UI)
-    // - category must be one of: general/personal/team/education/business/research (lowercase)
-    // - color must be a hex value (e.g. "#4F8CFF"), never a Tailwind gradient string
-    // - if accentColor exists, send it as color
-    const normalizeCreatePayload = (p) => {
-      const safe = p ?? {};
-      const rawCategory = safe.category;
-      const category = typeof rawCategory === "string" ? rawCategory.toLowerCase() : rawCategory;
-
-      const accentColor = safe.accentColor;
-      const rawColor = safe.color;
-
-      // Tailwind gradient patterns (e.g. "from-blue-500/20 to-indigo-500/10") should never be sent.
-      const looksLikeGradient = (v) => {
-        if (typeof v !== "string") return false;
-        return /\bfrom-[a-z]+-\d+\/|\bto-[a-z]+-\d+\//i.test(v);
-      };
-
-      // Accept only hex-like values when sending to backend.
-      const looksLikeHex = (v) => {
-        if (typeof v !== "string") return false;
-        return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(v.trim());
-      };
-
-      // If accentColor exists, it should be the backend color (per requirements).
-      // Otherwise, only forward color if it's a valid hex.
-      const backendColor = (() => {
-        if (accentColor && looksLikeHex(accentColor) && !looksLikeGradient(accentColor)) return accentColor;
-        if (rawColor && looksLikeHex(rawColor) && !looksLikeGradient(rawColor)) return rawColor;
-        return undefined;
-      })();
-
-      return {
-        name: safe.name,
-        description: safe.description,
-        category,
-        color: backendColor,
-        icon: safe.icon,
-      };
-    };
-
-    const outgoingPayload = normalizeCreatePayload(payload);
-
-    // optimistic: nothing reliable (backend will generate IDs); add placeholder only for immediate UX
     try {
       const res = await workspaceService.createWorkspace(outgoingPayload);
-      const workspace = normalizeWorkspace(res?.data?.workspace ?? res?.data ?? null);
-
+      const workspace = normalizeWorkspace(extractWorkspace(res));
 
       set((state) => ({
         loading: false,
         error: null,
-        workspaces: workspace
-          ? [workspace, ...state.workspaces]
-          : state.workspaces,
+        workspaces: workspace ? [workspace, ...state.workspaces] : state.workspaces,
       }));
 
+      await refreshAll(get);
       return workspace;
     } catch (e) {
       safeRollback(set, prevSnapshot);
@@ -171,28 +183,26 @@ export const useWorkspaceStore = create((set, get) => ({
   updateWorkspace: async (id, payload) => {
     const prevSnapshot = { ...get() };
     const target = normalizeId(id);
+    const outgoingPayload = normalizeApiPayload(payload);
 
-    // optimistic update: update fields on cached item
     set((state) => ({
       loading: true,
       error: null,
       workspaces: state.workspaces.map((w) =>
         normalizeId(w.id) === target
-          ? normalizeWorkspace({ ...w, ...payload })
+          ? normalizeWorkspace({ ...w, ...outgoingPayload, ...payload })
           : w
       ),
     }));
 
     try {
-      const res = await workspaceService.updateWorkspace(id, payload);
-      const updated = normalizeWorkspace(res?.data?.workspace ?? res?.data ?? null);
+      const res = await workspaceService.updateWorkspace(id, outgoingPayload);
+      const updated = normalizeWorkspace(extractWorkspace(res));
 
       set((state) => ({
         loading: false,
         error: null,
-        workspaces: state.workspaces.map((w) =>
-          normalizeId(w.id) === target && updated ? updated : w
-        ),
+        workspaces: replaceWorkspaceInList(state.workspaces, target, updated),
         currentWorkspace:
           state.currentWorkspace && normalizeId(state.currentWorkspace.id) === target
             ? updated
@@ -203,6 +213,7 @@ export const useWorkspaceStore = create((set, get) => ({
             : state.selectedWorkspace,
       }));
 
+      await get().fetchStats();
       return updated;
     } catch (e) {
       safeRollback(set, prevSnapshot);
@@ -224,6 +235,7 @@ export const useWorkspaceStore = create((set, get) => ({
     try {
       await workspaceService.deleteWorkspace(id);
       set({ loading: false, error: null });
+      await refreshAll(get);
       return true;
     } catch (e) {
       safeRollback(set, prevSnapshot);
@@ -237,21 +249,11 @@ export const useWorkspaceStore = create((set, get) => ({
   },
 
   favorite: async (id, value) => {
-    return get()._toggleFlagOptimistic(
-      id,
-      value,
-      "favorite",
-      workspaceService.favoriteWorkspace
-    );
+    return get()._toggleFlagOptimistic(id, value, "favorite", workspaceService.favoriteWorkspace);
   },
 
   archive: async (id, value) => {
-    return get()._toggleFlagOptimistic(
-      id,
-      value,
-      "archived",
-      workspaceService.archiveWorkspace
-    );
+    return get()._toggleFlagOptimistic(id, value, "archived", workspaceService.archiveWorkspace);
   },
 
   restore: async (id) => {
@@ -259,7 +261,6 @@ export const useWorkspaceStore = create((set, get) => ({
     const target = normalizeId(id);
 
     set((state) => ({
-      loading: true,
       error: null,
       workspaces: state.workspaces.map((w) =>
         normalizeId(w.id) === target ? { ...w, archived: false } : w
@@ -268,52 +269,51 @@ export const useWorkspaceStore = create((set, get) => ({
 
     try {
       const res = await workspaceService.restoreWorkspace(id);
-      const restored = normalizeWorkspace(res?.data?.workspace ?? res?.data ?? null);
+      const restored = normalizeWorkspace(extractWorkspace(res));
 
       set((state) => ({
-        loading: false,
         error: null,
-        workspaces: state.workspaces.map((w) =>
-          normalizeId(w.id) === target && restored ? restored : w
-        ),
+        workspaces: replaceWorkspaceInList(state.workspaces, target, restored),
       }));
 
+      await refreshAll(get);
       return restored;
     } catch (e) {
       safeRollback(set, prevSnapshot);
-      set({ loading: false, error: e?.response?.data ?? e?.message ?? String(e) });
+      set({ error: e?.response?.data ?? e?.message ?? String(e) });
       throw e;
     }
   },
 
   openWorkspace: async (id) => {
-    // optional: optimistic lastOpened update
     const prevSnapshot = { ...get() };
     const target = normalizeId(id);
+    const now = new Date().toISOString();
 
     set((state) => ({
       workspaces: state.workspaces.map((w) =>
-        normalizeId(w.id) === target ? { ...w, lastOpened: new Date().toISOString() } : w
+        normalizeId(w.id) === target ? { ...w, lastOpened: now, archived: false } : w
       ),
     }));
 
     try {
       const res = await workspaceService.openWorkspace(id);
-      const opened = normalizeWorkspace(res?.data?.workspace ?? res?.data ?? null);
+      const opened = normalizeWorkspace(extractWorkspace(res));
 
-      set((state) => ({
-        workspaces: state.workspaces.map((w) =>
-          normalizeId(w.id) === target && opened ? opened : w
-        ),
-        currentWorkspace:
-          state.currentWorkspace && normalizeId(state.currentWorkspace.id) === target
-            ? opened
-            : state.currentWorkspace,
-        selectedWorkspace:
-          state.selectedWorkspace && normalizeId(state.selectedWorkspace.id) === target
-            ? opened
-            : state.selectedWorkspace,
-      }));
+      set((state) => {
+        const withLastOpened = opened ? { ...opened, lastOpened: now } : opened;
+        return {
+          workspaces: replaceWorkspaceInList(state.workspaces, target, withLastOpened),
+          currentWorkspace:
+            state.currentWorkspace && normalizeId(state.currentWorkspace.id) === target
+              ? withLastOpened
+              : state.currentWorkspace,
+          selectedWorkspace:
+            state.selectedWorkspace && normalizeId(state.selectedWorkspace.id) === target
+              ? withLastOpened
+              : state.selectedWorkspace,
+        };
+      });
 
       return opened;
     } catch (e) {
@@ -324,14 +324,14 @@ export const useWorkspaceStore = create((set, get) => ({
   },
 
   refresh: async () => {
-    return get().fetchWorkspaces();
+    return refreshAll(get);
   },
 
   fetchStats: async () => {
     set({ statsLoading: true, statsError: null });
     try {
       const res = await workspaceService.getWorkspaceStats();
-      const data = res?.data?.stats ?? res?.data?.data ?? res?.data ?? null;
+      const data = extractStats(res);
       set({ stats: data, statsLoading: false, statsError: null });
       return data;
     } catch (e) {
@@ -343,13 +343,11 @@ export const useWorkspaceStore = create((set, get) => ({
     }
   },
 
-  // ---- Optimistic helpers (internal) ----
   _toggleFlagOptimistic: async (id, value, field, apiFn) => {
     const prevSnapshot = { ...get() };
     const target = normalizeId(id);
 
     set((state) => ({
-      loading: true,
       error: null,
       workspaces: state.workspaces.map((w) =>
         normalizeId(w.id) === target ? { ...w, [field]: value } : w
@@ -358,25 +356,22 @@ export const useWorkspaceStore = create((set, get) => ({
 
     try {
       const res = await apiFn(id, value);
-      const updated = normalizeWorkspace(res?.data?.workspace ?? res?.data ?? null);
+      const updated = normalizeWorkspace(extractWorkspace(res));
 
       set((state) => ({
-        loading: false,
         error: null,
-        workspaces: state.workspaces.map((w) =>
-          normalizeId(w.id) === target && updated ? updated : w
-        ),
+        workspaces: replaceWorkspaceInList(state.workspaces, target, updated),
       }));
 
+      await get().fetchStats();
       return updated;
     } catch (e) {
       safeRollback(set, prevSnapshot);
-      set({ loading: false, error: e?.response?.data ?? e?.message ?? String(e) });
+      set({ error: e?.response?.data ?? e?.message ?? String(e) });
       throw e;
     }
   },
 
-  // ---- Back-compat action names used by existing pages/components ----
   addWorkspace: (payload) => get().createWorkspace(payload),
 
   togglePinWorkspace: (id) => {
@@ -395,24 +390,16 @@ export const useWorkspaceStore = create((set, get) => ({
 
   restoreWorkspace: (id) => get().restore(id),
 
-  // used by list/details pages
   duplicateWorkspace: (id) => {
     const ws = get().getWorkspaceById(id);
     if (!ws) return Promise.resolve(null);
-    const payload = {
+    return get().createWorkspace({
       name: `${ws.name} (Copy)`,
       description: ws.description,
       category: ws.category,
       icon: ws.icon,
       color: ws.color,
       accentColor: ws.accentColor,
-      tags: ws.tags,
-    };
-    return get().createWorkspace(payload);
+    });
   },
-
-  // Existing pages compute stats client-side using helpers.
-  // fetchStats() is still available for future wiring, but we don’t force it here.
 }));
-
-

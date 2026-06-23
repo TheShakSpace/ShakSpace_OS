@@ -9,7 +9,7 @@ import {
   Cpu,
   HardDrive,
 } from "lucide-react";
-import { formatDate, formatRelativeTime, formatStorage } from "../../utils/workspaceHelpers";
+import { formatDate, formatRelativeTime, formatStorage, formatCategoryLabel } from "../../utils/workspaceHelpers";
 import WorkspaceActions from "./WorkspaceActions";
 
 const STATUS_STYLES = {
@@ -31,6 +31,7 @@ export default function WorkspaceCard({
   index = 0,
 }) {
   const statusClass = STATUS_STYLES[workspace.status] ?? STATUS_STYLES.active;
+  const accentHex = workspace.accentColor ?? "#4F8CFF";
 
   return (
     <motion.div
@@ -41,9 +42,10 @@ export default function WorkspaceCard({
       className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm flex flex-col relative group overflow-hidden min-h-[280px] hover:border-[#4F8CFF]/30 hover:shadow-lg hover:shadow-[#4F8CFF]/5 transition-shadow"
     >
       <div
-        className={`absolute top-0 right-0 w-36 h-36 bg-gradient-to-tr ${
-          workspace.color ?? "from-blue-500/20 to-indigo-500/10"
-        } blur-2xl opacity-30 group-hover:opacity-50 transition-opacity pointer-events-none`}
+        className="absolute top-0 right-0 w-36 h-36 blur-2xl opacity-30 group-hover:opacity-50 transition-opacity pointer-events-none"
+        style={{
+          background: `radial-gradient(circle at top right, ${accentHex}55, transparent 70%)`,
+        }}
       />
 
       <div className="z-10 flex-1 flex flex-col">
@@ -74,7 +76,7 @@ export default function WorkspaceCard({
         </div>
 
         <span className="self-start px-2 py-0.5 bg-white/[0.05] border border-white/[0.08] text-[9px] font-bold uppercase text-[#4F8CFF] rounded-full mb-2">
-          {workspace.category ?? "Development"}
+          {formatCategoryLabel(workspace.category)}
         </span>
 
         <p className="text-xs text-[#A0A6B1] line-clamp-2 mb-3 flex-1">

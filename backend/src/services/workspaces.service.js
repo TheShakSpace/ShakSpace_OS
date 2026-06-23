@@ -1,14 +1,27 @@
+const mongoose = require('mongoose');
 const Workspace = require('../models/Workspace');
 const { AppError } = require('../utils/AppError');
 
-function toObjectId(id) {
-  // Let mongoose cast; we validate at route layer.
-  return id;
+const QUERY_TIMEOUT_MS = 15000;
+
+function toOwnerId(ownerId) {
+  if (!ownerId) return null;
+  try {
+    return new mongoose.Types.ObjectId(String(ownerId));
+  } catch {
+    return ownerId;
+  }
 }
 
 async function getWorkspaceOrThrow({ ownerId, workspaceId }) {
-  const workspace = await Workspace.findOne({ owner: ownerId, _id: toObjectId(workspaceId) });
-  if (!workspace) throw new AppError('Workspace not found', { statusCode: 404, code: 'WORKSPACE_NOT_FOUND' });
+  const workspace = await Workspace.findOne({
+    owner: toOwnerId(ownerId),
+    _id: workspaceId,
+  }).maxTimeMS(QUERY_TIMEOUT_MS);
+
+  if (!workspace) {
+    throw new AppError('Workspace not found', { statusCode: 404, code: 'WORKSPACE_NOT_FOUND' });
+  }
   return workspace;
 }
 
@@ -27,19 +40,31 @@ function buildWorkspaceSearchQuery(q) {
   };
 }
 
-async function listWorkspaces({ ownerId, page, limit, q, sortBy, sortOrder, category, pinnedOnly, favoriteOnly, archivedOnly }) {
-  console.log('[workspaces.service] entering listWorkspaces()');
-  // Ensure we always return a resolved promise (no hanging cursors).
+function stripUndefined(obj) {
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined));
+}
+
+async function listWorkspaces({
+  ownerId,
+  page,
+  limit,
+  q,
+  sortBy,
+  sortOrder,
+  category,
+  pinnedOnly,
+  favoriteOnly,
+  archivedOnly,
+}) {
+  if (!ownerId) {
+    throw new AppError('Unauthorized', { statusCode: 401, code: 'UNAUTHORIZED' });
+  }
+
   const skip = (page - 1) * limit;
-
-
-  // Safety: prevent pathological queries from hanging in Mongo.
-  // (Also guarantees we never return a never-resolving promise.)
-  if (!ownerId) throw new AppError('Unauthorized', { statusCode: 401, code: 'UNAUTHORIZED' });
-
+  const owner = toOwnerId(ownerId);
 
   const query = {
-    owner: ownerId,
+    owner,
   };
 
   Object.assign(query, buildWorkspaceSearchQuery(q));
@@ -51,28 +76,18 @@ async function listWorkspaces({ ownerId, page, limit, q, sortBy, sortOrder, cate
 
   const sort = buildWorkspaceSort(sortBy, sortOrder);
 
-  console.log('[workspaces.service] before Workspace.countDocuments()');
   const [total, items] = await Promise.all([
-    Workspace.countDocuments(query).then((r) => {
-      console.log('[workspaces.service] after countDocuments()');
-      return r;
-    }),
-    (async () => {
-      console.log('[workspaces.service] before Workspace.find()');
-      const res = await Workspace.find(query)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec();
-      console.log('[workspaces.service] after Workspace.find()');
-      return res;
-    })(),
+    Workspace.countDocuments(query).maxTimeMS(QUERY_TIMEOUT_MS).exec(),
+    Workspace.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .maxTimeMS(QUERY_TIMEOUT_MS)
+      .exec(),
   ]);
 
-  console.log('[workspaces.service] before return');
   return {
-
     items,
     pagination: {
       total,
@@ -83,24 +98,30 @@ async function listWorkspaces({ ownerId, page, limit, q, sortBy, sortOrder, cate
   };
 }
 
-
 async function getWorkspace({ ownerId, workspaceId }) {
   const workspace = await getWorkspaceOrThrow({ ownerId, workspaceId });
   return workspace.toObject();
 }
 
 async function createWorkspace({ ownerId, payload }) {
-  // owner is always set from auth
-  const workspace = await Workspace.create({ ...payload, owner: ownerId });
-  return workspace.toObject();
+  try {
+    const workspace = await Workspace.create({ ...payload, owner: toOwnerId(ownerId) });
+    return workspace.toObject();
+  } catch (e) {
+    if (e?.code === 11000) {
+      throw new AppError('Workspace name already exists', {
+        statusCode: 409,
+        code: 'WORKSPACE_NAME_TAKEN',
+      });
+    }
+    throw e;
+  }
 }
 
 async function updateWorkspace({ ownerId, workspaceId, payload }) {
   const workspace = await getWorkspaceOrThrow({ ownerId, workspaceId });
 
-  // Immutable fields: owner and flags can still be changed via dedicated endpoints.
-  // But PUT is full update; accept explicit fields excluding flags.
-  const update = { ...payload };
+  const update = stripUndefined({ ...payload });
   delete update.owner;
 
   Object.assign(workspace, update);
@@ -116,7 +137,7 @@ async function deleteWorkspace({ ownerId, workspaceId }) {
 
 async function setFlag({ ownerId, workspaceId, flag, value }) {
   const workspace = await getWorkspaceOrThrow({ ownerId, workspaceId });
-  workspace[flag] = value;
+  workspace[flag] = Boolean(value);
   await workspace.save();
   return workspace.toObject();
 }
@@ -138,7 +159,6 @@ async function restoreWorkspace({ ownerId, workspaceId }) {
 }
 
 async function openWorkspace({ ownerId, workspaceId }) {
-  // Schema has no lastOpened; interpret open as un-archiving.
   const workspace = await getWorkspaceOrThrow({ ownerId, workspaceId });
   workspace.archived = false;
   await workspace.save();
@@ -146,17 +166,19 @@ async function openWorkspace({ ownerId, workspaceId }) {
 }
 
 async function stats({ ownerId }) {
+  const owner = toOwnerId(ownerId);
+
   const [total, pinned, archived, favorites, categoriesAgg] = await Promise.all([
-    Workspace.countDocuments({ owner: ownerId }),
-    Workspace.countDocuments({ owner: ownerId, pinned: true }),
-    Workspace.countDocuments({ owner: ownerId, archived: true }),
-    Workspace.countDocuments({ owner: ownerId, favorite: true }),
+    Workspace.countDocuments({ owner }).maxTimeMS(QUERY_TIMEOUT_MS).exec(),
+    Workspace.countDocuments({ owner, pinned: true }).maxTimeMS(QUERY_TIMEOUT_MS).exec(),
+    Workspace.countDocuments({ owner, archived: true }).maxTimeMS(QUERY_TIMEOUT_MS).exec(),
+    Workspace.countDocuments({ owner, favorite: true }).maxTimeMS(QUERY_TIMEOUT_MS).exec(),
     Workspace.aggregate([
-      { $match: { owner: ownerId } },
+      { $match: { owner } },
       { $group: { _id: '$category', count: { $sum: 1 } } },
       { $project: { _id: 0, category: '$_id', count: 1 } },
       { $sort: { count: -1 } },
-    ]),
+    ]).option({ maxTimeMS: QUERY_TIMEOUT_MS }),
   ]);
 
   return {
@@ -181,4 +203,3 @@ module.exports = {
   openWorkspace,
   stats,
 };
-

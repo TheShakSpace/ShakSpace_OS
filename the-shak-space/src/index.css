@@ -110,3 +110,95 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Knowledge Hub markdown preview */
+.knowledge-preview {
+  color: #e2e8f0;
+  line-height: 1.7;
+  font-size: 15px;
+}
+.knowledge-preview h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.75rem;
+  color: #fff;
+}
+.knowledge-preview h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  color: #f1f5f9;
+}
+.knowledge-preview h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  color: #f1f5f9;
+}
+.knowledge-preview p {
+  margin: 0.75rem 0;
+}
+.knowledge-preview ul,
+.knowledge-preview ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+.knowledge-preview li {
+  margin: 0.25rem 0;
+}
+.knowledge-preview blockquote {
+  border-left: 3px solid #8b5cf6;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+.knowledge-preview code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: #c4b5fd;
+}
+.knowledge-preview pre {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.knowledge-preview pre code {
+  background: transparent;
+  padding: 0;
+  color: #e2e8f0;
+}
+.knowledge-preview a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+.knowledge-preview img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+.knowledge-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+.knowledge-preview th,
+.knowledge-preview td {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+.knowledge-preview th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+.knowledge-preview hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 1.5rem 0;
+}

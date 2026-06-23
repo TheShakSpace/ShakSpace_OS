@@ -2,10 +2,11 @@ const mongoose = require('mongoose');
 
 const knowledgeSchema = new mongoose.Schema(
   {
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     workspace: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
 
     title: { type: String, required: true, trim: true, minlength: 1, maxlength: 200 },
-    content: { type: String, required: true, default: '' },
+    content: { type: String, default: '' },
     summary: { type: String, default: '', trim: true, maxlength: 800 },
 
     tags: {
@@ -18,39 +19,51 @@ const knowledgeSchema = new mongoose.Schema(
       index: true,
     },
 
-    collection: { type: String, default: 'default', trim: true, maxlength: 80, index: true },
-
-    attachments: {
-      type: [
-        {
-          filename: { type: String, required: true, trim: true, maxlength: 200 },
-          url: { type: String, required: true, trim: true, maxlength: 2000 },
-          mimeType: { type: String, default: null, trim: true, maxlength: 120 },
-          sizeBytes: { type: Number, default: 0, min: 0 },
-        },
-      ],
-      default: [],
+    category: {
+      type: String,
+      default: 'general',
+      enum: ['general', 'personal', 'team', 'education', 'business', 'research'],
+      index: true,
     },
+
+    color: {
+      type: String,
+      default: '#8B5CF6',
+      validate: {
+        validator: (v) => /^#([0-9a-fA-F]{3}){1,2}$/.test(v),
+        message: (props) => `${props.value} is not a valid hex color`,
+      },
+    },
+
+    icon: { type: String, default: '📝', trim: true, maxlength: 64 },
 
     favorite: { type: Boolean, default: false, index: true },
     pinned: { type: Boolean, default: false, index: true },
     archived: { type: Boolean, default: false, index: true },
 
+    lastOpened: { type: Date, default: null, index: true },
     lastEdited: { type: Date, default: Date.now, index: true },
+
+    wordCount: { type: Number, default: 0, min: 0 },
+    readingTime: { type: Number, default: 1, min: 0 },
   },
   { timestamps: true }
 );
 
-knowledgeSchema.index({ workspace: 1, title: 1 });
+knowledgeSchema.index({ owner: 1, workspace: 1, title: 1 });
 knowledgeSchema.index({ workspace: 1, archived: 1 });
-knowledgeSchema.index({ workspace: 1, collection: 1 });
+knowledgeSchema.index({ owner: 1, lastEdited: -1 });
 
-knowledgeSchema.pre('save', function (next) {
-  if (this.isModified('content') || this.isModified('summary') || this.isModified('title') || this.isModified('tags')) {
+knowledgeSchema.pre('save', function preSave(next) {
+  if (
+    this.isModified('content') ||
+    this.isModified('summary') ||
+    this.isModified('title') ||
+    this.isModified('tags')
+  ) {
     this.lastEdited = new Date();
   }
   next();
 });
 
 module.exports = mongoose.model('Knowledge', knowledgeSchema);
-

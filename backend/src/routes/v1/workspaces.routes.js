@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { authJwt } = require('../../middleware/authJwt');
 const { validateRequest } = require('../../validators/validate');
+const { normalizeWorkspaceBody } = require('../../utils/workspaceNormalize');
 
 const workspacesController = require('../../controllers/workspaces.controller');
 const {
@@ -19,39 +20,29 @@ const {
 
 const router = Router();
 
-
-
 router.use(authJwt(true));
 
-router.get(
-  "/",
-  ...workspaceList(),
-  validateRequest,
-  workspacesController.list
-);
+router.get('/', ...workspaceList(), validateRequest, workspacesController.list);
+
+router.get('/stats', ...workspaceStats(), validateRequest, workspacesController.stats);
 
 router.post(
-  "/",
-  (req, res, next) => {
-    console.log("POST ROUTE ENTERED");
-    next();
-  },
+  '/',
+  normalizeWorkspaceBody,
   ...workspaceCreate(),
-  (req, res, next) => {
-    console.log("POST VALIDATION PASSED");
-    next();
-  },
   validateRequest,
-  (req, res, next) => {
-    console.log("POST BEFORE CONTROLLER");
-    next();
-  },
   workspacesController.create
 );
 
 router.get('/:workspaceId', ...workspaceGet(), validateRequest, workspacesController.getById);
 
-router.put('/:workspaceId', ...workspaceUpdate(), validateRequest, workspacesController.update);
+router.put(
+  '/:workspaceId',
+  normalizeWorkspaceBody,
+  ...workspaceUpdate(),
+  validateRequest,
+  workspacesController.update
+);
 
 router.delete('/:workspaceId', ...workspaceDelete(), validateRequest, workspacesController.remove);
 
@@ -61,7 +52,4 @@ router.patch('/:workspaceId/archive', ...workspaceArchive(), validateRequest, wo
 router.patch('/:workspaceId/restore', ...workspaceRestore(), validateRequest, workspacesController.restore);
 router.patch('/:workspaceId/open', ...workspaceOpen(), validateRequest, workspacesController.open);
 
-
 module.exports = router;
-
-

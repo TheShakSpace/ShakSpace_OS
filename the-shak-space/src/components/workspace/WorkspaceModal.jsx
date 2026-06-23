@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import WorkspaceTemplates from "./WorkspaceTemplates";
 
+import { BACKEND_CATEGORIES } from "../../utils/workspaceHelpers";
+
 const EMPTY_FORM = {
   name: "",
   description: "",
-  category: "",
+  category: "general",
   icon: "📁",
   color: "from-blue-500/20 to-indigo-500/10",
   accentColor: "#4F8CFF",
@@ -22,6 +24,7 @@ export default function WorkspaceModal({
   onSubmit,
   onSelectTemplate,
   selectedTemplateId,
+  submitting = false,
 }) {
   const nameRef = useRef(null);
 
@@ -133,13 +136,18 @@ export default function WorkspaceModal({
                   <label htmlFor="ws-category" className="block text-xs font-bold text-white mb-1">
                     Category
                   </label>
-                  <input
+                  <select
                     id="ws-category"
-                    value={form.category}
+                    value={form.category || "general"}
                     onChange={(e) => onFormChange({ ...form, category: e.target.value })}
-                    className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-[#4F8CFF]/60"
-                    placeholder="e.g. Development"
-                  />
+                    className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-[#4F8CFF]/60 cursor-pointer"
+                  >
+                    {BACKEND_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat} className="bg-[#14171C]">
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="ws-icon" className="block text-xs font-bold text-white mb-1">
@@ -188,10 +196,14 @@ export default function WorkspaceModal({
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={onSubmit}
-                  disabled={!isValid}
+                  disabled={!isValid || submitting}
                   className="px-4 py-2 rounded-xl text-sm bg-[#4F8CFF] text-white hover:brightness-110 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {mode === "edit" ? "Save Changes" : "Create Workspace"}
+                  {submitting
+                    ? "Saving..."
+                    : mode === "edit"
+                      ? "Save Changes"
+                      : "Create Workspace"}
                 </motion.button>
               </div>
             </div>

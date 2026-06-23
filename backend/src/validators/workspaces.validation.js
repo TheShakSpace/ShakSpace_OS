@@ -1,4 +1,8 @@
 const { body, param, query } = require('express-validator');
+const {
+  normalizeWorkspaceQueryCategory,
+  normalizeWorkspaceCategory,
+} = require('../utils/workspaceNormalize');
 
 const workspaceId = param('workspaceId')
   .isString()
@@ -30,6 +34,7 @@ const category = body('category')
   .optional()
   .isString()
   .bail()
+  .customSanitizer(normalizeWorkspaceCategory)
   .isIn(['general', 'personal', 'team', 'education', 'business', 'research'])
   .withMessage('Invalid category');
 
@@ -54,26 +59,27 @@ const paginationQuery = [
   query('q').optional().isString(),
   query('sortBy').optional().isIn(['createdAt', 'updatedAt', 'name', 'category']),
   query('sortOrder').optional().isIn(['asc', 'desc']),
-  query('category').optional().isIn(['general', 'personal', 'team', 'education', 'business', 'research']),
-  query('pinnedOnly').optional().isBoolean().withMessage('pinnedOnly must be boolean'),
-  query('favoriteOnly').optional().isBoolean().withMessage('favoriteOnly must be boolean'),
-  query('archivedOnly').optional().isBoolean().withMessage('archivedOnly must be boolean'),
+  query('category')
+    .optional()
+    .customSanitizer(normalizeWorkspaceQueryCategory)
+    .isIn(['general', 'personal', 'team', 'education', 'business', 'research']),
+  query('pinnedOnly').optional().isBoolean().withMessage('pinnedOnly must be boolean').toBoolean(),
+  query('favoriteOnly').optional().isBoolean().withMessage('favoriteOnly must be boolean').toBoolean(),
+  query('archivedOnly').optional().isBoolean().withMessage('archivedOnly must be boolean').toBoolean(),
 ];
 
 const pinValue = body('value')
   .exists()
   .withMessage('value is required')
   .isBoolean()
-  .withMessage('value must be boolean');
-
-// For restore/open we don’t accept body; routes are action-based.
+  .withMessage('value must be boolean')
+  .toBoolean();
 
 function workspaceCreate() {
   return [name, description, category, color, icon];
 }
 
 function workspaceUpdate() {
-  // Keep consistent with PUT: require fields similar to create.
   return [name, description, category, color, icon];
 }
 
@@ -126,4 +132,3 @@ module.exports = {
   workspaceOpen,
   workspaceStats,
 };
-

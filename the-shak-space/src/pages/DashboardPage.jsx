@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Zap,
 } from "lucide-react";
+import { useKnowledgeStore } from "../stores/useKnowledgeStore";
+import { formatDate } from "../utils/knowledgeHelpers";
 
 const LOG_ICON_BY_ACTION = {
   "modified workspace description": Briefcase,
@@ -24,6 +26,23 @@ const LOG_ICON_BY_ACTION = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const knowledgeNotes = useKnowledgeStore((s) => s.knowledge);
+  const fetchKnowledge = useKnowledgeStore((s) => s.fetchKnowledge);
+  const knowledgeStats = useKnowledgeStore((s) => s.stats);
+
+  useEffect(() => {
+    fetchKnowledge({ limit: 10, sortBy: "lastEdited" }).catch(() => {});
+    useKnowledgeStore.getState().fetchStats().catch(() => {});
+  }, [fetchKnowledge]);
+
+  const recentNotes = [...knowledgeNotes]
+    .filter((n) => !n.archived)
+    .sort((a, b) => new Date(b.lastEdited ?? b.updatedAt) - new Date(a.lastEdited ?? a.updatedAt))
+    .slice(0, 3);
+
+  const notes = recentNotes.length
+    ? recentNotes
+    : [];
 
   const [workspaces, setWorkspaces] = React.useState([
     { id: "1", name: "Acme Client space", items: 12, category: "Design", updated: "2m ago", color: "from-blue-500/20 to-indigo-500/10" },
@@ -32,11 +51,12 @@ export default function DashboardPage() {
     { id: "4", name: "Engineering Monorepo", items: 34, category: "Development", updated: "3d ago", color: "from-emerald-500/20 to-teal-500/10" },
   ]);
 
-  const [notes, setNotes] = React.useState([
-    { id: 1, title: "Product Requirements Doc (PRD)", date: "Jun 14, 2026", duration: "5 min read" },
-    { id: 2, title: "Vibe and Aesthetic Guidelines", date: "Jun 12, 2026", duration: "12 min read" },
-    { id: 3, title: "Next.js 16 Server Components Plan", date: "Jun 10, 2026", duration: "3 min read" },
-  ]);
+  const displayNotes = notes.map((n) => ({
+    id: n.id,
+    title: n.title,
+    date: formatDate(n.updatedAt),
+    duration: `${n.readingTime ?? 1} min read`,
+  }));
 
   const [automations, setAutomations] = React.useState([
     { id: 1, name: "Auto-sort Incoming Slack Files", trigger: "Slack File Uploaded", action: "Move to Knowledge Hub", active: true },
@@ -79,17 +99,7 @@ export default function DashboardPage() {
   };
 
   const handleAddNewNote = () => {
-    const defaultTitles = ["Weekly Standup Minutes", "Brainstorming Session Notes", "System Design Architecture", "Marketing Outlines"];
-    const title = defaultTitles[Math.floor(Math.random() * defaultTitles.length)];
-    const newNote = {
-      id: Date.now(),
-      title,
-      date: "Jun 14, 2026",
-      duration: `${Math.floor(Math.random() * 8) + 2} min read`,
-    };
-
-    setNotes([newNote, ...notes]);
-    addNewLog("Shak", "drafted high-fidelity note", title, "optimized prompt performance");
+    navigate("/knowledge");
   };
 
   return (
@@ -205,7 +215,7 @@ export default function DashboardPage() {
           <div className="p-5 bg-white/[0.02] border border-[rgba(255,255,255,0.06)] rounded-2xl flex items-center justify-between">
             <div>
               <span className="text-[10px] font-bold text-[#A0A6B1] uppercase tracking-wider block">Documents Index</span>
-              <span className="text-2xl font-black font-mono tracking-tight text-white mt-1 block">{notes.length} Active</span>
+              <span className="text-2xl font-black font-mono tracking-tight text-white mt-1 block">{knowledgeStats?.total ?? displayNotes.length} Active</span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
               <FileText size={18} className="text-purple-400" />
@@ -308,7 +318,7 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-sm font-bold text-white mb-2">System Design Recommendation</h3>
             <p className="text-xs text-[#A0A6B1] leading-relaxed mb-4">
-              "We observed you drafted {notes.length} documents matching Product Requirements. I suggest binding a direct GitHub Webhook trigger to automatically push builds on commit logs."
+              "We observed you drafted {knowledgeStats?.total ?? displayNotes.length} documents in your knowledge base. I suggest binding a direct GitHub Webhook trigger to automatically push builds on commit logs."
             </p>
             <div className="p-3 bg-[#4F8CFF]/5 border border-[#4F8CFF]/10 rounded-xl flex items-center justify-between">
               <div>
@@ -330,13 +340,20 @@ export default function DashboardPage() {
           <div className="p-6 bg-white/[0.03] border border-white/[0.08] rounded-2xl">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">Indexed Documents</h3>
-              <span className="text-[10px] font-mono text-[#A0A6B1]">{notes.length} Files</span>
+              <span className="text-[10px] font-mono text-[#A0A6B1]">{displayNotes.length} Files</span>
             </div>
             <div className="space-y-3">
-              {notes.slice(0, 3).map((note) => (
+              {displayNotes.length === 0 ? (
+                <p className="text-xs text-[#A0A6B1] text-center py-4">No notes yet. Create one in Knowledge Hub.</p>
+              ) : (
+                displayNotes.slice(0, 3).map((note) => (
                 <div
                   key={note.id}
-                  className="p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.03] flex items-center justify-between transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/knowledge/${note.id}`)}
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`/knowledge/${note.id}`)}
+                  className="p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.03] flex items-center justify-between transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     <FileText size={14} className="text-purple-400 shrink-0" />
@@ -344,7 +361,8 @@ export default function DashboardPage() {
                   </div>
                   <span className="text-[10px] text-[#A0A6B1] shrink-0">{note.duration}</span>
                 </div>
-              ))}
+              ))
+              )}
             </div>
             <button
               onClick={() => navigate("/knowledge")}

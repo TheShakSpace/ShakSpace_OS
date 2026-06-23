@@ -17,6 +17,12 @@ export default function KnowledgeToolbar({
   tags,
   onNewNote,
   viewTitle,
+  workspaceFilter,
+  onWorkspaceFilterChange,
+  workspaces = [],
+  selectedCategory,
+  onCategoryChange,
+  categories = [],
 }) {
   return (
     <motion.div
@@ -32,7 +38,7 @@ export default function KnowledgeToolbar({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onNewNote}
-          className={`${CONTROL_HEIGHT} px-4 bg-purple-500 hover:brightness-110 font-bold text-xs text-white rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer transition-all shrink-0`}
+          className={`${CONTROL_HEIGHT} px-4 bg-purple-500 hover:brightness-110 font-bold text-xs text-white rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer`}
         >
           <Plus size={14} /> New Note
         </motion.button>
@@ -50,6 +56,38 @@ export default function KnowledgeToolbar({
           tags={tags}
           controlHeight={CONTROL_HEIGHT}
         />
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2.5">
+        <select
+          value={workspaceFilter}
+          onChange={(e) => onWorkspaceFilterChange(e.target.value)}
+          className="h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white outline-none cursor-pointer"
+        >
+          <option value="" className="bg-[#14171C]">All workspaces</option>
+          {workspaces.map((ws) => (
+            <option key={ws.id} value={ws.id} className="bg-[#14171C]">
+              {ws.name}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex flex-wrap gap-2">
+          {categories.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => onCategoryChange(c.value)}
+              className={`px-3 py-1 rounded-full text-xs border cursor-pointer ${
+                selectedCategory === c.value
+                  ? "bg-purple-500/20 border-purple-500/50 text-white"
+                  : "bg-white/[0.03] border-white/10 text-[#A0A6B1]"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
       </div>
     </motion.div>
   );

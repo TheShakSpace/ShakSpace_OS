@@ -9,6 +9,7 @@ import DashboardPage from "./pages/DashboardPage";
 import WorkspacesPage from "./pages/WorkspacePage";
 import WorkspaceDetailsPage from "./pages/WorkspaceDetailsPage";
 import KnowledgeHubPage from "./pages/KnowledgeHubPage";
+import KnowledgeDetailPage from "./pages/KnowledgeDetailPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import AutomationPage from "./pages/AutomationPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -16,6 +17,7 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 
 import { useAuthStore } from "./stores/useAuthStore";
+import { ToastContainer } from "./components/common/ToastContainer";
 
 
 
@@ -43,7 +45,9 @@ function App() {
 
 
   return (
-    <Routes>
+    <>
+      <ToastContainer />
+      <Routes>
       <Route
         path="/"
         element={
@@ -85,6 +89,17 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <KnowledgeHubPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/knowledge/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <KnowledgeDetailPage />
             </AppLayout>
           </ProtectedRoute>
         }
@@ -134,6 +149,7 @@ function App() {
         }
       />
     </Routes>
+    </>
   );
 }
 
