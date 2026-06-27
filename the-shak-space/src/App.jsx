@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 
 import SplashScreen from "./components/splash/SplashScreen";
 import AppLayout from "./components/layout/AppLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
+import LandingPage from "./pages/LandingPage";
 import DashboardPage from "./pages/DashboardPage";
 import WorkspacesPage from "./pages/WorkspacePage";
 import WorkspaceDetailsPage from "./pages/WorkspaceDetailsPage";
@@ -14,6 +15,7 @@ import AIAssistantPage from "./pages/AIAssistantPage";
 import AutomationPage from "./pages/AutomationPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
 import ProfilePage from "./pages/ProfilePage";
 
 import { useAuthStore } from "./stores/useAuthStore";
@@ -22,7 +24,6 @@ import { ToastContainer } from "./components/common/ToastContainer";
 
 
 function App() {
-  const [loading, setLoading] = useState(true);
   const restoreSession = useAuthStore((state) => state.restoreSession);
   const authLoading = useAuthStore((state) => state.authLoading);
 
@@ -31,15 +32,7 @@ function App() {
     restoreSession();
   }, [restoreSession]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 4000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (loading || authLoading) {
+  if (authLoading) {
     return <SplashScreen />;
   }
 
@@ -48,8 +41,13 @@ function App() {
     <>
       <ToastContainer />
       <Routes>
+      <Route path="/" element={<LandingPage />} />
+
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <AppLayout>
@@ -58,8 +56,6 @@ function App() {
           </ProtectedRoute>
         }
       />
-
-      <Route path="/login" element={<LoginPage />} />
 
       <Route
         path="/workspaces"

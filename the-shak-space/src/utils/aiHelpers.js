@@ -150,6 +150,30 @@ export function getModelById(id) {
   return AI_MODELS.find((m) => m.id === id) ?? AI_MODELS[0];
 }
 
+export function normalizeConversation(raw) {
+  if (!raw) return null;
+  return {
+    id: normalizeId(raw.id ?? raw._id),
+    title: raw.title ?? "New conversation",
+    provider: raw.provider ?? "gemini",
+    model: raw.model ?? "gemini-2.0-flash",
+    createdAt: raw.createdAt ?? null,
+    updatedAt: raw.updatedAt ?? null,
+  };
+}
+
+export function normalizeMessage(raw) {
+  if (!raw) return null;
+  return {
+    id: normalizeId(raw.id ?? raw._id),
+    conversationId: normalizeId(raw.conversationId ?? raw.conversation),
+    role: raw.role === "ai" ? "assistant" : (raw.role ?? "user"),
+    content: raw.content ?? "",
+    tokenCount: raw.tokenCount ?? 0,
+    createdAt: raw.createdAt ?? null,
+  };
+}
+
 export function deriveTitleFromMessage(content) {
   const line = content.trim().split("\n")[0] ?? "New Chat";
   return line.length > 48 ? `${line.slice(0, 48)}…` : line || "New Chat";

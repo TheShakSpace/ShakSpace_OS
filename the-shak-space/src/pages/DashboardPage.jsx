@@ -69,11 +69,11 @@ export default function DashboardPage() {
     duration: `${n.readingTime ?? 1} min read`,
   }));
 
-  const [automations, setAutomations] = React.useState([
+  const automations = [
     { id: 1, name: "Auto-sort Incoming Slack Files", trigger: "Slack File Uploaded", action: "Move to Knowledge Hub", active: true },
     { id: 2, name: "Weekly Workspace Summary PDF", trigger: "Every Friday at 5 PM", action: "Generate Document & Email", active: true },
     { id: 3, name: "Sync Notes to GitHub Gist", trigger: "On Note Created", action: "Trigger REST Endpoint", active: false },
-  ]);
+  ];
 
   const [logs, setLogs] = React.useState([
     { id: 1, user: "Shak", action: "modified workspace description", target: "Acme Client Space", time: "10 min ago", iconAction: "modified workspace description" },

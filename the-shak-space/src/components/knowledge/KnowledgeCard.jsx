@@ -1,6 +1,5 @@
 import { motion } from "motion/react";
 import {
-  FileText,
   Pin,
   Star,
   ArrowUpRight,

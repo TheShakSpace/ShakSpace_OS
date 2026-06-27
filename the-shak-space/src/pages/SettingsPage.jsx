@@ -1,4 +1,3 @@
-import React from "react";
 import { Sliders, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 

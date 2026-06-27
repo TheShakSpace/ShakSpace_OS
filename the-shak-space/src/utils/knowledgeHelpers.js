@@ -173,7 +173,7 @@ export function normalizeKnowledgeItem(item) {
 
 export function excerptContent(content, max = 160) {
   const plain = String(content ?? "")
-    .replace(/[#*_`>\[\]()!|-]/g, "")
+    .replace(/[#*_`>[\]()!|-]/g, "")
     .replace(/\s+/g, " ")
     .trim();
   if (!plain) return "";

@@ -14,9 +14,6 @@ import {
   Bell,
   Sparkles,
   Clock,
-  Briefcase,
-  FileText,
-  Workflow,
 } from "lucide-react";
 
 import { useAuthStore } from "../../stores/useAuthStore";
@@ -32,6 +29,7 @@ const MENU_ITEMS = [
 
 export default function AppLayout({ children }) {
   const user = useAuthStore((state) => state.user);
+  const isDemo = useAuthStore((state) => state.isDemo);
   const logout = useAuthStore((state) => state.logout);
 
   const navigate = useNavigate();
@@ -48,72 +46,6 @@ export default function AppLayout({ children }) {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef(null);
-
-  // Local state kept to preserve sidebar/topbar UI behavior & animations exactly as before.
-  // Page content now comes from {children}.
-  const [workspaces, setWorkspaces] = useState([
-    {
-      id: "1",
-      name: "Acme Client space",
-      items: 12,
-      category: "Design",
-      updated: "2m ago",
-      color: "from-blue-500/20 to-indigo-500/10",
-    },
-    {
-      id: "2",
-      name: "Product Design Hub",
-      items: 8,
-      category: "Product",
-      updated: "45m ago",
-      color: "from-purple-500/20 to-pink-500/10",
-    },
-    {
-      id: "3",
-      name: "Marketing Collateral",
-      items: 15,
-      category: "Marketing",
-      updated: "1d ago",
-      color: "from-amber-500/20 to-orange-500/10",
-    },
-    {
-      id: "4",
-      name: "Engineering Monorepo",
-      items: 34,
-      category: "Development",
-      updated: "3d ago",
-      color: "from-emerald-500/20 to-teal-500/10",
-    },
-  ]);
-
-  const [notes, setNotes] = useState([
-    { id: 1, title: "Product Requirements Doc (PRD)", date: "Jun 14, 2026", duration: "5 min read" },
-    { id: 2, title: "Vibe and Aesthetic Guidelines", date: "Jun 12, 2026", duration: "12 min read" },
-    { id: 3, title: "Next.js 16 Server Components Plan", date: "Jun 10, 2026", duration: "3 min read" },
-  ]);
-
-  const [logs, setLogs] = useState([
-    { id: 1, user: "Shak", action: "modified workspace description", target: "Acme Client Space", time: "10 min ago" },
-    { id: 2, user: "Shak Space Assistant", action: "optimized prompt performance", target: "Knowledge Synthesizer", time: "30 min ago" },
-    { id: 3, user: "Agent Runner", action: "triggered workflow", target: "Sync Notes -> Slack", time: "2 hrs ago" },
-  ]);
-
-  const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState([
-    {
-      id: 1,
-      role: "assistant",
-      content:
-        "Greetings! I'm your Shak Space AI Assistant. I have indexed your current workspaces, notes, and local automation rules. Ask me anything to generate, summarize, or trigger actions.",
-    },
-  ]);
-  const [isAiTyping, setIsAiTyping] = useState(false);
-
-  const [automations, setAutomations] = useState([
-    { id: 1, name: "Auto-sort Incoming Slack Files", trigger: "Slack File Uploaded", action: "Move to Knowledge Hub", active: true },
-    { id: 2, name: "Weekly Workspace Summary PDF", trigger: "Every Friday at 5 PM", action: "Generate Document & Email", active: true },
-    { id: 3, name: "Sync Notes to GitHub Gist", trigger: "On Note Created", action: "Trigger REST Endpoint", active: false },
-  ]);
 
   const userDisplayName = useMemo(() => user?.name || "Guest", [user?.name]);
   const userDisplayEmail = useMemo(() => user?.email || "guest@example.com", [user?.email]);
@@ -142,71 +74,6 @@ export default function AppLayout({ children }) {
     };
   }, [isProfileOpen]);
 
-  const handleAddNewWorkspace = () => {
-    const names = ["Aperture Science Hub", "Vector Sync Platform", "Black Mesa Portal", "Oasis Sandbox"];
-    const cats = ["Research", "Platform", "Engineering", "Design"];
-    const colors = [
-      "from-rose-500/20 to-red-500/10",
-      "from-cyan-500/20 to-blue-500/10",
-      "from-indigo-500/20 to-purple-500/10",
-      "from-violet-500/20 to-fuchsia-500/10",
-    ];
-    const index = Math.floor(Math.random() * names.length);
-    const newWs = {
-      id: String(Date.now()),
-      name: names[index],
-      items: Math.floor(Math.random() * 20) + 1,
-      category: cats[index],
-      updated: "Just now",
-      color: colors[index],
-    };
-    setWorkspaces([newWs, ...workspaces]);
-    setLogs((prev) => [{ id: Date.now(), user: "Shak", action: "created new workspace", target: newWs.name, time: "Just now" }, ...prev.slice(0, 5)]);
-  };
-
-  const handleAddNewNote = () => {
-    const defaultTitles = [
-      "Weekly Standup Minutes",
-      "Brainstorming Session Notes",
-      "System Design Architecture",
-      "Marketing Outlines",
-    ];
-    const title = defaultTitles[Math.floor(Math.random() * defaultTitles.length)];
-    const newNote = {
-      id: Date.now(),
-      title,
-      date: "Jun 14, 2026",
-      duration: `${Math.floor(Math.random() * 8) + 2} min read`,
-    };
-    setNotes([newNote, ...notes]);
-    setLogs((prev) => [{ id: Date.now(), user: "Shak", action: "drafted high-fidelity note", target: title, time: "Just now" }, ...prev.slice(0, 5)]);
-  };
-
-  const askAiSimulation = (queryText) => {
-    const prompt = queryText || aiInput;
-    if (!prompt.trim()) return;
-
-    const userMsg = { id: Date.now(), role: "user", content: prompt };
-    setAiMessages((prev) => [...prev, userMsg]);
-    setAiInput("");
-    setIsAiTyping(true);
-
-    setTimeout(() => {
-      let reply =
-        "I took a look at the system logs. Everything is configured correctly. Let me know if you would like me to build a dashboard widget or start an automation flow.";
-      if (prompt.toLowerCase().includes("workspace")) {
-        reply = `I registered ${workspaces.length} active workspaces. The latest is '${workspaces[0].name}'. Would you like me to map interactive nodes for them?`;
-      } else if (prompt.toLowerCase().includes("note") || prompt.toLowerCase().includes("doc")) {
-        reply = `I am analyzing your ${notes.length} saved documents in the Knowledge Hub. Based on 'Product Requirements Doc (PRD)', I suggest forming an automation card to sync checklist progress.`;
-      } else if (prompt.toLowerCase().includes("automation") || prompt.toLowerCase().includes("sync")) {
-        reply = "Automations are online and healthy. The 'Weekly Workspace Summary PDF' is set to send on Friday. I can add custom Webhooks upon request.";
-      }
-
-      setAiMessages((prev) => [...prev, { id: Date.now() + 1, role: "assistant", content: reply }]);
-      setIsAiTyping(false);
-    }, 1000);
-  };
-
   const onLogout = () => {
     logout();
     navigate("/login", { replace: true });
@@ -223,9 +90,9 @@ export default function AppLayout({ children }) {
         <div className="h-[64px] border-b border-[rgba(255,255,255,0.08)] flex items-center px-6 justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex gap-1.5 shrink-0">
-              <span className="w-3 h-3 rounded-full bg-[#FF5F56] opacity-90 block hover:scale-105 transition-transform" />
-              <span className="w-3 h-3 rounded-full bg-[#FFBD2E] opacity-90 block hover:scale-105 transition-transform" />
-              <span className="w-3 h-3 rounded-full bg-[#27C93F] opacity-90 block hover:scale-105 transition-transform" />
+              <span className="w-3 h-3 rounded-full bg-[#FF5F56] opacity-90 block" />
+              <span className="w-3 h-3 rounded-full bg-[#FFBD2E] opacity-90 block" />
+              <span className="w-3 h-3 rounded-full bg-[#27C93F] opacity-90 block" />
             </div>
             {!isCollapsed && (
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 ml-2">
@@ -260,7 +127,7 @@ export default function AppLayout({ children }) {
           </div>
         ) : (
           <div className="py-4 flex justify-center">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center font-bold text-xs ring-4 ring-white/5 hover:scale-105 transition-transform cursor-pointer">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center font-bold text-xs ring-4 ring-white/5 cursor-pointer">
               S
             </div>
           </div>
@@ -272,7 +139,7 @@ export default function AppLayout({ children }) {
             const IconComponent = item.icon;
 
             const routeById = {
-              dashboard: "/",
+              dashboard: "/dashboard",
               workspaces: "/workspaces",
               "knowledge-hub": "/knowledge",
               "ai-assistant": "/ai",
@@ -280,7 +147,7 @@ export default function AppLayout({ children }) {
               settings: "/settings",
             };
 
-            const to = routeById[item.id] || "/";
+            const to = routeById[item.id] || "/dashboard";
 
             return (
               <NavLink
@@ -355,6 +222,13 @@ export default function AppLayout({ children }) {
           </div>
 
           <div className="flex items-center gap-4">
+            {isDemo && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-[#4F8CFF]/10 border border-[#4F8CFF]/25 rounded-lg text-[11px] text-[#4F8CFF] font-semibold">
+                <Sparkles size={12} />
+                <span>Demo Mode</span>
+              </div>
+            )}
+
             <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-white/[0.03] border border-white/[0.06] rounded-lg text-[11px] text-[#A0A6B1]">
               <Clock size={12} className="text-[#4F8CFF]" />
               <span className="font-mono">UTC: 2026-06-14</span>

@@ -1,8 +1,5 @@
 import React from "react";
-import { motion } from "motion/react";
-import { Navigate, useNavigate } from "react-router-dom";
-
-import ParticleField from "../components/splash/ParticleField";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 
 import {
   Mail,
@@ -27,89 +24,37 @@ export default function LoginPage() {
 
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const login = useAuthStore((state) => state.login);
+  const demoLogin = useAuthStore((state) => state.demoLogin);
   const authLoading = useAuthStore((state) => state.authLoading);
   const validationError = useAuthStore((state) => state.validationError);
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  const [typedLine, setTypedLine] = React.useState("");
-  const [lineIndex, setLineIndex] = React.useState(0);
 
   const handleLogin = async () => {
     try {
       await login({ email, password });
-      navigate("/");
+      navigate("/dashboard");
     } catch {
       // backend validation errors are already stored in Zustand
     }
   };
 
+  const handleTryDemo = () => {
+    demoLogin();
+    navigate("/dashboard");
+  };
 
-  const lines = [
-    "SYSTEM STATUS: ONLINE",
-    "SECURE CONNECTION ESTABLISHED",
-    "AUTH NODE READY",
-  ];
-
-  React.useEffect(() => {
-    const current = lines[lineIndex] ?? "";
-    setTypedLine("");
-
-    // Stop typing/advancing after the final line
-    const isLastLine = lineIndex >= lines.length - 1;
-
-    const t1 = window.setTimeout(() => {
-      let i = 0;
-      const interval = window.setInterval(() => {
-        i += 1;
-        setTypedLine(current.slice(0, i));
-
-        if (i >= current.length) {
-          window.clearInterval(interval);
-
-          if (!isLastLine) {
-            window.setTimeout(() => {
-              setLineIndex((prev) => prev + 1);
-            }, 550);
-          }
-        }
-      }, 14);
-
-      return () => window.clearInterval(interval);
-    }, 180);
-
-    return () => window.clearTimeout(t1);
-  }, [lineIndex, lines.length]);
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
-      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="min-h-screen bg-[#050816] relative overflow-hidden px-4"
-    >
-      {/* Particle background (splash-like) */}
-      <div className="absolute inset-0 pointer-events-none z-0">
-        <ParticleField />
-      </div>
-
-      {/* Floating blue ambient glows */}
-      <motion.div
-        className="absolute -top-28 -left-24 w-96 h-96 rounded-full bg-[#4F8CFF]/20 blur-3xl"
-        animate={{ y: [0, 16, 0], x: [0, 10, 0] }}
-        transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute -bottom-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-indigo-500/20 blur-3xl"
-        animate={{ y: [0, -18, 0], x: [0, -12, 0] }}
-        transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut" }}
-      />
+    <div className="min-h-screen bg-[#050816] relative overflow-hidden px-4">
+      {/* Ambient glows */}
+      <div className="absolute -top-28 -left-24 w-96 h-96 rounded-full bg-[#4F8CFF]/15 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-indigo-500/15 blur-3xl pointer-events-none" />
 
       {/* Subtle grid */}
       <div
-        className="absolute inset-0 pointer-events-none z-0 opacity-[0.22]"
+        className="absolute inset-0 pointer-events-none z-0 opacity-[0.18]"
         style={{
           backgroundImage:
             "linear-gradient(to right, rgba(79,140,255,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(79,140,255,0.18) 1px, transparent 1px)",
@@ -185,34 +130,16 @@ export default function LoginPage() {
               </div>
 
               <div className="relative z-10">
-                {/* Animated THE SHAK SPACE OS heading + boot status typing */}
-                <motion.div
-                  initial={{ opacity: 0, y: -12, filter: "blur(6px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                  className="mb-6"
-                >
-                  <div className="text-center">
-                    <motion.div
-                      animate={{ y: [0, -6, 0] }}
-                      transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut" }}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#4F8CFF]/30 bg-[#4F8CFF]/10"
-                    >
-                      <span className="text-xs font-mono tracking-widest uppercase text-[#A0A6B1]">
-                        THE SHAK SPACE OS
-                      </span>
-                    </motion.div>
-
-                    <div className="mt-5">
-                      <div className="text-[11px] font-mono text-white/60">
-                        {typedLine || " "}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
+                <div className="mb-6 text-center">
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#4F8CFF]/30 bg-[#4F8CFF]/10">
+                    <span className="text-xs font-mono tracking-widest uppercase text-[#A0A6B1]">
+                      THE SHAK SPACE OS
+                    </span>
+                  </span>
+                </div>
 
                 {/* Glassmorphism login card */}
-                <div className="rounded-2xl border border-[#4F8CFF]/25 bg-white/[0.02] p-6 hover:shadow-[0_0_0_1px_rgba(79,140,255,0.35)] transition-shadow">
+                <div className="rounded-2xl border border-[#4F8CFF]/25 bg-white/[0.02] p-6">
                   <div className="text-center mb-6">
                     <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#4F8CFF] via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/10 ring-1 ring-white/10">
                       <span className="text-xl font-black tracking-widest">S</span>
@@ -225,9 +152,8 @@ export default function LoginPage() {
 
                   <form
                     className="space-y-4"
-                  onSubmit={(e) => {
+                    onSubmit={(e) => {
                       e.preventDefault();
-                      console.log("[LoginPage] form submit");
                       handleLogin();
                     }}
                   >
@@ -307,14 +233,20 @@ export default function LoginPage() {
 
                     <button
                       type="button"
+                      onClick={handleTryDemo}
                       className="w-full px-4 py-2.5 rounded-xl text-sm border border-white/[0.10] text-[#A0A6B1] hover:text-white hover:border-white/[0.20] transition-colors cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <span className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#4F8CFF]">
-                        <ArrowRight size={14} />
-                      </span>
-                      Continue with Google
+                      <Sparkles size={14} className="text-[#4F8CFF]" />
+                      Try the Demo
                     </button>
                   </form>
+
+                  <p className="mt-5 text-center text-[12px] text-[#A0A6B1]">
+                    Don&apos;t have an account?{" "}
+                    <Link to="/signup" className="text-[#4F8CFF] hover:underline inline-flex items-center gap-1">
+                      Sign up <ArrowRight size={12} />
+                    </Link>
+                  </p>
                 </div>
               </div>
             </div>
@@ -322,30 +254,17 @@ export default function LoginPage() {
 
           {/* Mobile layout */}
           <div className="md:hidden">
-            <motion.div
-              initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl shadow-2xl p-6 relative overflow-hidden"
-            >
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl shadow-2xl p-6 relative overflow-hidden">
               <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute -top-28 -right-24 w-72 h-72 rounded-full bg-[#4F8CFF]/20 blur-3xl" />
               </div>
 
               <div className="relative z-10 text-center">
-                <motion.div
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut" }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#4F8CFF]/30 bg-[#4F8CFF]/10"
-                >
+                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#4F8CFF]/30 bg-[#4F8CFF]/10">
                   <span className="text-xs font-mono tracking-widest uppercase text-[#A0A6B1]">
                     THE SHAK SPACE OS
                   </span>
-                </motion.div>
-
-                <div className="mt-4 text-[11px] font-mono text-white/60">
-                  {typedLine || " "}
-                </div>
+                </span>
 
                 <div className="mt-6 rounded-2xl border border-[#4F8CFF]/25 bg-white/[0.02] p-5">
                   <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#4F8CFF] via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/10 ring-1 ring-white/10">
@@ -358,6 +277,7 @@ export default function LoginPage() {
                     className="mt-5 space-y-4 text-left"
                     onSubmit={(e) => {
                       e.preventDefault();
+                      handleLogin();
                     }}
                   >
                     <div>
@@ -413,28 +333,34 @@ export default function LoginPage() {
 
                     <button
                       type="submit"
+                      disabled={authLoading}
                       className="w-full px-4 py-2.5 rounded-xl text-sm bg-[#4F8CFF] text-white hover:brightness-110 transition-all cursor-pointer disabled:opacity-60"
                     >
-                      Login
+                      {authLoading ? "Logging in..." : "Login"}
                     </button>
 
                     <button
                       type="button"
+                      onClick={handleTryDemo}
                       className="w-full px-4 py-2.5 rounded-xl text-sm border border-white/[0.10] text-[#A0A6B1] hover:text-white hover:border-white/[0.20] transition-colors cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <span className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#4F8CFF]">
-                        <ArrowRight size={14} />
-                      </span>
-                      Continue with Google
+                      <Sparkles size={14} className="text-[#4F8CFF]" />
+                      Try the Demo
                     </button>
                   </form>
+
+                  <p className="mt-5 text-center text-[12px] text-[#A0A6B1]">
+                    Don&apos;t have an account?{" "}
+                    <Link to="/signup" className="text-[#4F8CFF] hover:underline inline-flex items-center gap-1">
+                      Sign up <ArrowRight size={12} />
+                    </Link>
+                  </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
-
