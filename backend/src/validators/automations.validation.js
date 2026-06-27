@@ -1,13 +1,5 @@
 const { body, param, query } = require('express-validator');
 
-const automationId = param('automationId')
-  .isString()
-  .bail()
-  .notEmpty()
-  .withMessage('automationId is required')
-  .isMongoId()
-  .withMessage('automationId must be a valid ObjectId');
-
 const idParam = param('id')
   .isString()
   .bail()
@@ -58,18 +50,6 @@ const searchFilters = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('category too long'),
-];
-
-const filtersQuery = [
-  query('enabled').optional().isBoolean().withMessage('enabled must be boolean'),
-  query('favorite').optional().isBoolean().withMessage('favorite must be boolean'),
-  query('pinned').optional().isBoolean().withMessage('pinned must be boolean'),
-  query('archived').optional().isBoolean().withMessage('archived must be boolean'),
-  query('workspaceId').optional().isMongoId().withMessage('workspaceId must be a valid ObjectId'),
-  ...pageLimitQuery,
-  ...sortQuery,
-  query('newest').optional(),
-  query('oldest').optional(),
 ];
 
 const createUpdateBody = [
@@ -146,10 +126,6 @@ const updateBody = [
 
 const flagBody = (fieldName) => [
   body(fieldName).exists().withMessage(`${fieldName} is required`).isBoolean().withMessage(`${fieldName} must be boolean`),
-];
-
-const categoryQuery = [
-  query('category').optional().isString().trim().isLength({ max: 200 }).withMessage('category too long'),
 ];
 
 function automationsList() {

@@ -46,10 +46,6 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// keep indexes minimal but production-friendly
-userSchema.index({ email: 1 });
-userSchema.index({ role: 1 });
-
 // Virtual: unify role+roles (for JWT payload compatibility)
 userSchema.virtual('effectiveRoles').get(function effectiveRoles() {
   const fromRoles = Array.isArray(this.roles) && this.roles.length ? this.roles : [];

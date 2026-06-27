@@ -35,7 +35,7 @@ function buildAutomationSort({ sortBy, sortOrder }) {
   // Task requires newest/oldest; accept both styles.
   if (sortBy === 'oldest') return { createdAt: 1 };
   if (sortBy === 'newest') return { createdAt: -1 };
-  return { createdAt: order === 1 ? 1 : -1 };
+  return { createdAt: order };
 }
 
 function defaultTemplateByName(name) {

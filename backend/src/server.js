@@ -4,13 +4,18 @@ const env = require('./config/env');
 const logger = require('./utils/logger');
 
 async function start() {
+  logger.info('Starting The Shak Space backend...');
+  logger.info(`Environment: ${env.nodeEnv}`);
+
   await bootstrap();
 
   const server = http.createServer(app);
 
   const port = env.port;
   server.listen(port, () => {
-    logger.info(`Backend listening on port ${port}`);
+    logger.success(`Server is running -> http://localhost:${port}`);
+    logger.info(`Health check       -> http://localhost:${port}/health`);
+    logger.info(`Allowed frontend    -> ${env.cors.origins.join(', ')}`);
   });
 
   const shutdown = (signal) => {
